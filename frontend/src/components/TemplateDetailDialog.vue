@@ -241,6 +241,7 @@ const getValuePreview = (value: any): string => {
 // 查看默认值
 const viewDefaultValue = (param: TemplateParam) => {
   currentViewingParam.value = param
+  console.log('currentViewingParam', currentViewingParam.value)
   monacoVisible.value = true
 }
 

@@ -26,7 +26,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/designer',
     name: 'Designer',
-    component: () => import('@/views/OperatorDesigner.vue'),
+    component: () => import('@/views/OperatorDesigner/index.vue'),
     meta: { title: '编排设计器' }
   },
   {

@@ -195,10 +195,13 @@
                     <el-form-item label="默认值" label-width="80px">
                       <MonacoEditor
                         v-model="param.defaultValue"
-                        :title="`${param.paramName || '参数'} - 默认值`"
+                        :readonly="false"
+                        :options="{}"
+                        title="`${param.paramName || '参数'} - 默认值`"
                         :language="getEditorLanguage(param.paramType)"
                         height="150px"
                         width="100%"
+                        theme="vs"
                         :placeholder="`请输入${param.paramType || 'string'}类型的默认值`"
                         :show-toolbar="true"
                         :show-status="false"
@@ -258,20 +261,7 @@ const visible = computed({
 const formRef = ref<FormInstance>()
 const saving = ref(false)
 
-interface FormData {
-  categoryId: number | string
-  templateCode: string
-  templateName: string
-  description: string
-  executorClass: string
-  executorMethod: string
-  configSchema: string
-  inputSchema: string
-  outputSchema: string
-  status: boolean
-}
-
-const form = reactive<FormData>({
+const form = reactive<OperatorTemplate>({
   categoryId: 0,
   templateCode: '',
   templateName: '',
@@ -285,7 +275,7 @@ const form = reactive<FormData>({
 })
 
 // 保存初始值，用于取消时恢复
-const initialFormData = ref<Partial<FormData>>({})
+const initialFormData = ref<Partial<OperatorTemplate>>({})
 
 // 参数相关变量
 const templateParams = ref<(TemplateParam & { tempId?: string })[]>([]) // 参数列表
@@ -454,13 +444,13 @@ const handleSave = async () => {
     
     let templateResponse
     if (props.editingTemplate) {
-      templateResponse = await templateApi.updateTemplate(props.editingTemplate.id, form)
+      templateResponse = await templateApi.updateTemplate(props.editingTemplate?.id || 0, form)
     } else {
       templateResponse = await templateApi.createTemplate(form)
     }
     
     if (templateResponse.success) {
-      const templateId = props.editingTemplate ? props.editingTemplate.id : templateResponse.data.id
+      const templateId: number = props.editingTemplate?.id || templateResponse.data?.id || 0
       
       // 保存参数数据
       try {
