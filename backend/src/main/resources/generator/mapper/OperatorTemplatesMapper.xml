@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.operatorchoreography.generator.mapper.OperatorTemplatesMapper">
+
+    <!-- 通用查询映射结果 -->
+    <resultMap id="BaseResultMap" type="com.operatorchoreography.generator.model.OperatorTemplates">
+        <id column="id" property="id" />
+        <result column="category_id" property="categoryId" />
+        <result column="template_code" property="templateCode" />
+        <result column="template_name" property="templateName" />
+        <result column="description" property="description" />
+        <result column="icon" property="icon" />
+        <result column="version" property="version" />
+        <result column="executor_class" property="executorClass" />
+        <result column="executor_method" property="executorMethod" />
+        <result column="input_schema" property="inputSchema" />
+        <result column="output_schema" property="outputSchema" />
+        <result column="is_async" property="isAsync" />
+        <result column="timeout_seconds" property="timeoutSeconds" />
+        <result column="retry_count" property="retryCount" />
+        <result column="status" property="status" />
+        <result column="created_at" property="createdAt" />
+        <result column="updated_at" property="updatedAt" />
+    </resultMap>
+
+    <!-- 通用查询结果列 -->
+    <sql id="Base_Column_List">
+        id, category_id, template_code, template_name, description, icon, version, executor_class, executor_method, input_schema, output_schema, is_async, timeout_seconds, retry_count, status, created_at, updated_at
+    </sql>
+
+</mapper>

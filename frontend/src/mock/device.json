@@ -1,0 +1,30 @@
+{
+  "inputData": {
+    "id": "DEV_001_20250128005",
+    "device_code": "SENSOR_TEMP_005",
+    "device_name": "一楼大厅温度传感器",
+    "device_type": "传感器",
+    "device_category": "环境监测设备",
+    "device_model": "TH-2000",
+    "manufacturer": "华为技术有限公司",
+    "serial_number": "HW-TH-2000-20240101-001",
+    "location": "一楼大厅东南角墙面",
+    "building": "办公楼A栋",
+    "floor": "1楼",
+    "room": "大厅",
+    "coordinates": "116.397128,39.916527,2.5",
+    "device_status": 1,
+    "install_date": "2024-01-15",
+    "warranty_date": "2027-01-15",
+    "last_maintenance_date": "2024-12-01",
+    "next_maintenance_date": "2025-06-01",
+    "power_consumption": 5.5,
+    "operating_voltage": "DC 12V",
+    "operating_temperature": "-20°C ~ +60°C",
+    "ip_rating": "IP65",
+    "communication_protocol": "TCP/IP",
+    "network_address": "192.168.1.101",
+    "description": "用于监测大厅环境温湿度，支持实时数据采集和报警功能",
+    "remarks": "设备运行正常，定期校准"
+  }
+}

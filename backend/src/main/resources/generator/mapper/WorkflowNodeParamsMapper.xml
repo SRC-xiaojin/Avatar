@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.operatorchoreography.generator.mapper.WorkflowNodeParamsMapper">
+
+    <!-- 通用查询映射结果 -->
+    <resultMap id="BaseResultMap" type="com.operatorchoreography.generator.model.WorkflowNodeParams">
+        <id column="id" property="id" />
+        <result column="node_id" property="nodeId" />
+        <result column="param_key" property="paramKey" />
+        <result column="param_value" property="paramValue" />
+        <result column="param_type" property="paramType" />
+        <result column="value_source" property="valueSource" />
+        <result column="source_expression" property="sourceExpression" />
+        <result column="created_at" property="createdAt" />
+        <result column="updated_at" property="updatedAt" />
+    </resultMap>
+
+    <!-- 通用查询结果列 -->
+    <sql id="Base_Column_List">
+        id, node_id, param_key, param_value, param_type, value_source, source_expression, created_at, updated_at
+    </sql>
+
+</mapper>

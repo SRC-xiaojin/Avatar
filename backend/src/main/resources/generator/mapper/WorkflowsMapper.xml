@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.operatorchoreography.generator.mapper.WorkflowsMapper">
+
+    <!-- 通用查询映射结果 -->
+    <resultMap id="BaseResultMap" type="com.operatorchoreography.generator.model.Workflows">
+        <id column="id" property="id" />
+        <result column="workflow_code" property="workflowCode" />
+        <result column="workflow_name" property="workflowName" />
+        <result column="description" property="description" />
+        <result column="version" property="version" />
+        <result column="status" property="status" />
+        <result column="execution_mode" property="executionMode" />
+        <result column="max_execution_time" property="maxExecutionTime" />
+        <result column="tags" property="tags" />
+        <result column="variables" property="variables" />
+        <result column="created_by" property="createdBy" />
+        <result column="created_at" property="createdAt" />
+        <result column="updated_by" property="updatedBy" />
+        <result column="updated_at" property="updatedAt" />
+    </resultMap>
+
+    <!-- 通用查询结果列 -->
+    <sql id="Base_Column_List">
+        id, workflow_code, workflow_name, description, version, status, execution_mode, max_execution_time, tags, variables, created_by, created_at, updated_by, updated_at
+    </sql>
+
+</mapper>

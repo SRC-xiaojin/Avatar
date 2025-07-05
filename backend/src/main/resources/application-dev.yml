@@ -1,0 +1,59 @@
+# 开发环境配置
+server:
+  port: 8080
+
+spring:
+  # 数据源配置 - 开发环境
+  datasource:
+    url: jdbc:mysql://192.168.0.25:3306/operator_choreography?useSSL=false&serverTimezone=UTC&characterEncoding=utf8
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: root
+    password: 123456
+    # 开发环境使用连接池配置
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  # JPA配置 - 开发环境显示SQL
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+
+# 管理端点配置 - 开发环境开放更多端点
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"  # 开发环境开放所有端点
+  endpoint:
+    health:
+      show-details: always
+    beans:
+      enabled: true
+    env:
+      enabled: true
+    loggers:
+      enabled: true
+
+# SpringDoc OpenAPI 配置 - 开发环境
+springdoc:
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  show-actuator: true
+
+# 开发环境特殊配置
+debug: false  # 设置为true可以看到更详细的Spring Boot调试信息 

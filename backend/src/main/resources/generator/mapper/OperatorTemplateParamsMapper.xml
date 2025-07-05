@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.operatorchoreography.generator.mapper.OperatorTemplateParamsMapper">
+
+    <!-- 通用查询映射结果 -->
+    <resultMap id="BaseResultMap" type="com.operatorchoreography.generator.model.OperatorTemplateParams">
+        <id column="id" property="id" />
+        <result column="template_id" property="templateId" />
+        <result column="param_key" property="paramKey" />
+        <result column="param_name" property="paramName" />
+        <result column="param_type" property="paramType" />
+        <result column="param_category" property="paramCategory" />
+        <result column="is_required" property="isRequired" />
+        <result column="default_value" property="defaultValue" />
+        <result column="validation_rules" property="validationRules" />
+        <result column="created_at" property="createdAt" />
+        <result column="updated_at" property="updatedAt" />
+    </resultMap>
+
+    <!-- 通用查询结果列 -->
+    <sql id="Base_Column_List">
+        id, template_id, param_key, param_name, param_type, param_category, is_required, default_value, validation_rules, created_at, updated_at
+    </sql>
+
+</mapper>

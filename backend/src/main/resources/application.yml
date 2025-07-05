@@ -1,0 +1,33 @@
+# 主配置文件 - 通用配置
+spring:
+  application:
+    name: operator-choreography-backend
+  
+  # 设置激活的配置文件为开发环境
+  profiles:
+    active: dev
+
+# 默认配置，可被环境特定配置覆盖
+server:
+  port: 8080
+
+# 通用管理端点配置
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+# 默认SpringDoc OpenAPI 配置
+springdoc:
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+
+# 日志配置由 logback-spring.xml 管理 
