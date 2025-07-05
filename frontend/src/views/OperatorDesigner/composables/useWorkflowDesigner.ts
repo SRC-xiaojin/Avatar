@@ -98,10 +98,14 @@ export function useWorkflowDesigner(): UseWorkflowDesignerReturn {
 
   // 转换API数据格式
   const convertApiDataToLocal = (categories: ApiOperatorCategory[], templates: ApiOperatorTemplate[]): UIOperatorCategory[] => {
-    return categories.map(category => {
+    console.log('🔄 开始转换API数据格式...')
+    console.log('📋 原始分类数据:', categories)
+    console.log('🔧 原始模板数据:', templates)
+    
+    const result = categories.map(category => {
       const categoryTemplates = templates.filter(template => template.categoryId === category.id)
       
-      return {
+      const convertedCategory = {
         id: category.id || 0,
         title: category.categoryName,
         type: category.categoryCode,
@@ -116,12 +120,31 @@ export function useWorkflowDesigner(): UseWorkflowDesignerReturn {
           config: template.configSchema ? JSON.parse(template.configSchema) : getDefaultConfig(template.templateCode)
         }))
       }
+      
+      console.log(`📂 转换分类 "${category.categoryName}" (${category.categoryCode}):`, {
+        原始分类: category,
+        转换后分类: convertedCategory,
+        分类模板数量: categoryTemplates.length
+      })
+      
+      return convertedCategory
     })
+    
+    console.log('✅ API数据转换完成:', result)
+    return result
   }
 
   // 根据算子类型获取图标名称
   const getIconByType = (type: string): string => {
     const iconMap: Record<string, string> = {
+      // 新的5类算子库
+      'DATA_PROCESS': 'DataBoard',
+      'CONTROL': 'Switch', 
+      'SERVICE_CALL': 'PhoneFilled',
+      'DATABASE': 'Coin',
+      'FUNCTION': 'Tools',
+      
+      // 兼容旧的类型
       'TRANSFORM': 'DataBoard',
       'FILTER': 'Connection',
       'AGGREGATION': 'Coin',

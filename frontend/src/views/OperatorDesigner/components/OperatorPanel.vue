@@ -84,11 +84,16 @@ import {
   Connection,
   Coin,
   Tools,
-  Operation
+  Operation,
+  // 新增图标
+  SetUp,
+  PhoneFilled,
+  Histogram,
+  Operation as FunctionIcon
 } from '@element-plus/icons-vue'
 
 // 定义props
-defineProps({
+const props = defineProps({
   operatorCategories: {
     type: Array,
     default: () => []
@@ -100,24 +105,34 @@ defineProps({
   iconMap: {
     type: Object,
     default: () => ({})
+  },
+  // 折叠功能相关props
+  toggleCategory: {
+    type: Function,
+    required: true
+  },
+  isCategoryCollapsed: {
+    type: Function,
+    required: true
   }
 })
 
 // 定义emits
 const emit = defineEmits([
-  'toggle-category',
-  'is-category-collapsed',
   'operator-drag-start',
   'show-operator-details'
 ])
 
 // 转发方法调用到父组件
 const toggleCategory = (categoryId) => {
-  emit('toggle-category', categoryId)
+  console.log('🔄 OperatorPanel - 切换分类折叠状态:', categoryId)
+  props.toggleCategory(categoryId)
 }
 
 const isCategoryCollapsed = (categoryId) => {
-  return emit('is-category-collapsed', categoryId)
+  const collapsed = props.isCategoryCollapsed(categoryId)
+  console.log('👁️ OperatorPanel - 检查分类折叠状态:', categoryId, '是否折叠:', collapsed)
+  return collapsed
 }
 
 const onOperatorDragStart = (event, operator) => {

@@ -33,12 +33,12 @@
       <!-- 左侧算子面板 -->
       <OperatorPanel
         :operator-categories="operatorCategories"
-        :loading="loading"
+        :loading="loading || templateLoading"
         :icon-map="iconMap"
-        @toggle-category="toggleCategory"
-        @is-category-collapsed="isCategoryCollapsed"
+        :toggle-category="toggleCategory"
+        :is-category-collapsed="isCategoryCollapsed"
         @operator-drag-start="onOperatorDragStart"
-        @show-operator-details="showOperatorDetails"
+        @show-operator-details="showTemplateDetails"
       />
 
       <!-- 中央设计画布 -->
@@ -103,6 +103,12 @@
     <!-- 连线帮助面板 -->
     <HelpPanel v-model="showConnectionHelp" />
 
+    <!-- 模板详情对话框 -->
+    <TemplateDetailDialog 
+      v-model="showTemplateDetail"
+      :template="currentTemplate"
+    />
+
     <!-- 算子详情对话框 -->
     <el-dialog
       v-model="showOperatorDetail"
@@ -160,6 +166,7 @@
 
 <script setup>
 import { ref, reactive, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import { 
   Delete, 
   DocumentAdd, 
@@ -171,7 +178,11 @@ import {
   Connection,
   Coin,
   Tools,
-  Operation
+  Operation,
+  Loading,
+  // 新增图标
+  PhoneFilled,
+  Histogram
 } from '@element-plus/icons-vue'
 
 // 导入组件
@@ -180,11 +191,15 @@ import DesignCanvas from './components/DesignCanvas.vue'
 import PropertyPanel from './components/PropertyPanel.vue'
 import DebugPanel from './components/DebugPanel.vue'
 import HelpPanel from './components/HelpPanel.vue'
+import TemplateDetailDialog from '@/components/TemplateDetailDialog.vue'
 
 // 导入 composables
 import { useWorkflowDesigner } from './composables/useWorkflowDesigner'
 import { useConnectionManager } from './composables/useConnectionManager'
 import { useCanvasOperations } from './composables/useCanvasOperations'
+
+// 导入API
+import { templateApi } from '@/api/templates'
 
 // 画布引用
 const designCanvasRef = ref(null)
@@ -270,11 +285,24 @@ const showExecutionResult = ref(false)
 const executionLogs = ref([])
 const executionOutput = ref('')
 
+// 模板详情对话框状态
+const showTemplateDetail = ref(false)
+const currentTemplate = ref(null)
+const templateLoading = ref(false)
+
 // 操作日志
 const operationLogs = ref([])
 
 // 图标映射
 const iconMap = {
+  // 新的5类算子库
+  DATA_PROCESS: DataBoard,
+  CONTROL: Switch,
+  SERVICE_CALL: PhoneFilled,
+  DATABASE: Coin,
+  FUNCTION: Tools,
+  
+  // 兼容旧的类型
   INPUT: DataBoard,
   OUTPUT: DataBoard,
   TRANSFORM: Switch,
@@ -301,6 +329,42 @@ const onCanvasMouseMove = (event) => {
 const showOperatorDetailsHandler = (operator) => {
   currentOperator.value = operator
   showOperatorDetail.value = true
+}
+
+// 显示模板详情
+const showTemplateDetails = async (operator) => {
+  console.log('🔍 显示模板详情:', operator)
+  
+  if (!operator.templateId) {
+    console.warn('⚠️ 算子没有模板ID:', operator)
+    ElMessage.warning('该算子没有关联的模板信息')
+    return
+  }
+  
+  templateLoading.value = true
+  
+  try {
+    console.log('📡 正在加载模板详情...', operator.templateId)
+    const response = await templateApi.getTemplateDetails(operator.templateId)
+    
+    if (response.success && response.data) {
+      console.log('✅ 模板详情加载成功:', response.data)
+      currentTemplate.value = {
+        ...response.data.template,
+        params: response.data.params || []
+      }
+      showTemplateDetail.value = true
+      addOperationLog('info', `已加载模板详情: ${response.data.templateName}`)
+    } else {
+      console.error('❌ 模板详情加载失败:', response)
+      ElMessage.error('加载模板详情失败：' + (response.message || '未知错误'))
+    }
+  } catch (error) {
+    console.error('❌ 模板详情加载出错:', error)
+    ElMessage.error('加载模板详情出错：' + (error.message || '网络错误'))
+  } finally {
+    templateLoading.value = false
+  }
 }
 
 // 执行工作流
