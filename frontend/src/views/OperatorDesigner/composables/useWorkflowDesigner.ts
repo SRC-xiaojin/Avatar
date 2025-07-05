@@ -4,6 +4,8 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { categoryApi } from '@/api/categories'
 import { templateApi } from '@/api/templates'
+import { workflowApi, connectionApi } from '@/api/workflows'
+import { nodeApi } from '@/api/nodes'
 import type { 
   UIOperatorCategory, 
   UIOperatorTemplate, 
@@ -16,7 +18,11 @@ import type {
 } from '../types'
 import type { 
   OperatorCategory as ApiOperatorCategory, 
-  OperatorTemplate as ApiOperatorTemplate} from '@/types/api'
+  OperatorTemplate as ApiOperatorTemplate,
+  Workflow,
+  WorkflowNode,
+  WorkflowConnection
+} from '@/types/api'
 
 export function useWorkflowDesigner(): UseWorkflowDesignerReturn {
   // 路由相关
@@ -172,6 +178,212 @@ export function useWorkflowDesigner(): UseWorkflowDesignerReturn {
       ElMessage.warning(`加载算子分类失败`)
     } finally {
       loading.value = false
+    }
+  }
+
+  // 加载工作流数据
+  const loadWorkflow = async (workflowId: number): Promise<void> => {
+    if (!workflowId) return
+    
+    loading.value = true
+    currentWorkflowId.value = workflowId
+    
+    try {
+      console.log('🚀 开始加载工作流数据:', workflowId)
+      console.log('📡 开始并行API调用...')
+      
+      // 并行加载工作流、节点和连线数据
+      const [workflowResponse, nodesResponse, connectionsResponse] = await Promise.all([
+        workflowApi.getWorkflowById(workflowId),
+        nodeApi.getNodesByWorkflow(workflowId),
+        connectionApi.getConnectionsByWorkflow(workflowId)
+      ])
+      
+      console.log('📊 API响应结果:', {
+        工作流响应: {
+          成功: workflowResponse.success,
+          数据: workflowResponse.data,
+          消息: workflowResponse.message
+        },
+        节点响应: {
+          成功: nodesResponse.success,
+          数据长度: nodesResponse.data?.length || 0,
+          数据: nodesResponse.data,
+          消息: nodesResponse.message
+        },
+        连线响应: {
+          成功: connectionsResponse.success,
+          数据长度: connectionsResponse.data?.length || 0,
+          数据: connectionsResponse.data,
+          消息: connectionsResponse.message
+        }
+      })
+      
+      if (!workflowResponse.success) {
+        throw new Error(workflowResponse.message || '工作流加载失败')
+      }
+      
+      if (!nodesResponse.success) {
+        throw new Error(nodesResponse.message || '节点数据加载失败')
+      }
+      
+      if (!connectionsResponse.success) {
+        throw new Error(connectionsResponse.message || '连线数据加载失败')
+      }
+      
+      const workflow: Workflow = workflowResponse.data!
+      const nodes: WorkflowNode[] = nodesResponse.data || []
+      const workflowConnections: WorkflowConnection[] = connectionsResponse.data || []
+      
+      console.log('✅ 工作流数据加载成功:', {
+        工作流名称: workflow.workflowName,
+        工作流描述: workflow.description,
+        节点数量: nodes.length,
+        连线数量: workflowConnections.length,
+        原始节点数据: nodes,
+        原始连线数据: workflowConnections
+      })
+      
+      // 转换节点数据为画布节点
+      console.log('🔄 开始转换节点数据...')
+      const maxNodeId = Math.max(0, ...nodes.map(n => n.id || 0))
+      nextNodeId.value = maxNodeId + 1
+      
+      const oldCanvasNodes = [...canvasNodes.value]
+      canvasNodes.value = nodes.map(node => {
+        const canvasNode = {
+          id: node.id || 0,
+          type: 'CUSTOM' as any, // 暂时使用默认类型，后续可以通过templateId查询具体类型
+          name: node.nodeName || '未命名节点',
+          description: '', // WorkflowNode没有description字段，后续可以通过templateId查询
+          icon: getIconByType('CUSTOM'), // 暂时使用默认图标，后续可以通过templateId查询
+          templateId: node.templateId || 0,
+          categoryId: 0, // WorkflowNode没有categoryId字段，后续可以通过templateId查询
+          x: node.positionX || 100,
+          y: node.positionY || 100,
+          config: node.nodeConfig ? JSON.parse(node.nodeConfig) : getDefaultConfig('CUSTOM'),
+          dbId: node.id
+        }
+        
+        console.log('🎨 转换节点:', {
+          原始节点: node,
+          转换后节点: canvasNode
+        })
+        
+        return canvasNode
+      })
+      
+      console.log('📍 画布节点转换完成:', {
+        转换前节点数量: oldCanvasNodes.length,
+        转换后节点数量: canvasNodes.value.length,
+        nextNodeId: nextNodeId.value
+      })
+      
+      // 转换连线数据为画布连线
+      console.log('🔗 开始转换连线数据...')
+      const maxConnectionId = Math.max(0, ...workflowConnections.map(c => c.id || 0))
+      nextConnectionId.value = maxConnectionId + 1
+      
+      const oldConnections = [...connections.value]
+      connections.value = workflowConnections.map(conn => {
+        const connection = {
+          id: conn.id || 0,
+          sourceNodeId: conn.sourceNodeId,
+          targetNodeId: conn.targetNodeId,
+          type: (conn.connectionType || 'data') as ConnectionType
+        }
+        
+        console.log('🔗 转换连线:', {
+          原始连线: conn,
+          转换后连线: connection
+        })
+        
+        return connection
+      })
+      
+      console.log('🔗 画布连线转换完成:', {
+        转换前连线数量: oldConnections.length,
+        转换后连线数量: connections.value.length,
+        nextConnectionId: nextConnectionId.value
+      })
+      
+      console.log('🎯 工作流渲染完成:', {
+        画布节点数量: canvasNodes.value.length,
+        画布连线数量: connections.value.length,
+        节点详情: canvasNodes.value.map(n => ({
+          ID: n.id,
+          名称: n.name,
+          位置: { x: n.x, y: n.y },
+          数据库ID: n.dbId
+        })),
+        连线详情: connections.value.map(c => ({
+          ID: c.id,
+          源节点: c.sourceNodeId,
+          目标节点: c.targetNodeId,
+          类型: c.type
+        }))
+      })
+      
+      // 强制触发响应式更新
+      console.log('🔄 强制触发响应式更新...')
+      const tempNodes = [...canvasNodes.value]
+      const tempConnections = [...connections.value]
+      canvasNodes.value = []
+      connections.value = []
+      
+      // 使用nextTick确保DOM更新
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      canvasNodes.value = tempNodes
+      connections.value = tempConnections
+      
+      console.log('✅ 响应式更新完成')
+      
+      ElMessage.success(`工作流 "${workflow.workflowName}" 加载成功，包含 ${nodes.length} 个节点和 ${workflowConnections.length} 条连线`)
+      
+    } catch (error) {
+      console.error('❌ 加载工作流失败:', error)
+      console.error('❌ 错误堆栈:', error instanceof Error ? error.stack : '无堆栈信息')
+      ElMessage.error(`加载工作流失败: ${error instanceof Error ? error.message : '未知错误'}`)
+      
+      // 清空当前工作流ID
+      currentWorkflowId.value = null
+    } finally {
+      loading.value = false
+      console.log('🏁 工作流加载流程结束')
+    }
+  }
+
+  // 检查路由参数并自动加载工作流
+  const checkAndLoadWorkflow = async (): Promise<void> => {
+    console.log('🔍 开始检查路由参数...')
+    console.log('📍 当前路由信息:', {
+      路径: route.path,
+      参数: route.params,
+      查询: route.query,
+      完整路由: route
+    })
+    
+    const workflowId = route.params.workflowId || route.query.workflowId
+    console.log('🆔 获取到的工作流ID:', workflowId)
+    
+    if (workflowId) {
+      const id = parseInt(workflowId as string)
+      console.log('🔢 转换后的ID:', id, '是否有效:', !isNaN(id) && id > 0)
+      
+      if (!isNaN(id) && id > 0) {
+        console.log('✅ 检测到有效的工作流ID参数:', id)
+        try {
+          await loadWorkflow(id)
+          console.log('✅ 工作流加载完成')
+        } catch (error) {
+          console.error('❌ 工作流加载失败:', error)
+        }
+      } else {
+        console.warn('⚠️ 工作流ID无效:', workflowId)
+      }
+    } else {
+      console.log('ℹ️ 没有检测到工作流ID参数，跳过加载')
     }
   }
 
@@ -398,6 +610,8 @@ export function useWorkflowDesigner(): UseWorkflowDesignerReturn {
     showOperatorDetails,
     getDefaultConfig,
     loadOperatorCategories,
+    loadWorkflow,
+    checkAndLoadWorkflow,
     findNearestConnectionPoint,
     canCreateConnection,
     showConnectionError,

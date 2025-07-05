@@ -288,7 +288,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch, computed, onMounted, onUpdated } from 'vue'
 import { Close } from '@element-plus/icons-vue'
 
 // 定义props
@@ -380,6 +380,53 @@ defineEmits([
 
 // 画布引用
 const canvasRef = ref(null)
+
+// 计算属性用于调试
+const debugInfo = computed(() => ({
+  节点数量: props.canvasNodes.length,
+  连线数量: props.connections.length,
+  选中节点: props.selectedNode?.name || '无',
+  选中连线: props.selectedConnection?.id || '无',
+  拖拽节点: props.draggingNode?.name || '无',
+  临时连线状态: props.tempConnection.isDrawing ? '正在绘制' : '未绘制'
+}))
+
+// 监控节点变化
+watch(
+  () => props.canvasNodes,
+  (newNodes, oldNodes) => {
+    console.log('🎨 DesignCanvas - 节点数据变化:', {
+      新节点数量: newNodes.length,
+      旧节点数量: oldNodes?.length || 0,
+      新节点详情: newNodes.map(n => ({ id: n.id, name: n.name, x: n.x, y: n.y })),
+      调试信息: debugInfo.value
+    })
+  },
+  { deep: true, immediate: true }
+)
+
+// 监控连线变化
+watch(
+  () => props.connections,
+  (newConnections, oldConnections) => {
+    console.log('🔗 DesignCanvas - 连线数据变化:', {
+      新连线数量: newConnections.length,
+      旧连线数量: oldConnections?.length || 0,
+      新连线详情: newConnections.map(c => ({ id: c.id, source: c.sourceNodeId, target: c.targetNodeId })),
+      调试信息: debugInfo.value
+    })
+  },
+  { deep: true, immediate: true }
+)
+
+// 生命周期钩子
+onMounted(() => {
+  console.log('🎨 DesignCanvas - 组件挂载完成:', debugInfo.value)
+})
+
+onUpdated(() => {
+  console.log('🎨 DesignCanvas - 组件更新完成:', debugInfo.value)
+})
 
 // 暴露给父组件  
 defineExpose({

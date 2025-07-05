@@ -103,6 +103,7 @@ OperatorDesigner/
 - 节点和连线状态管理
 - 工作流加载和保存
 - 连线验证和错误处理
+- **工作流数据加载和渲染**
 
 **返回值：**
 ```typescript
@@ -115,6 +116,8 @@ OperatorDesigner/
   
   // 方法
   loadOperatorCategories: () => Promise<void>
+  loadWorkflow: (workflowId: number) => Promise<void>
+  checkAndLoadWorkflow: () => Promise<void>
   canCreateConnection: (sourceNodeId, targetNodeId, sourceType, targetType) => boolean
   selectConnection: (connection: Connection) => void
   deleteConnection: (connection: Connection) => void
@@ -160,6 +163,67 @@ OperatorDesigner/
   saveWorkflow: () => Promise<void>
   executeWorkflow: (logs, output, showResult) => Promise<void>
 }
+```
+
+## 工作流加载功能
+
+### 路由参数支持
+算子设计器现在支持通过路由参数自动加载已有的工作流：
+
+**URL格式：**
+```
+/operator-designer/123        # 路径参数
+/operator-designer?id=123     # 查询参数
+```
+
+### 加载流程
+1. **检测路由参数** - 在页面初始化时自动检测工作流ID
+2. **并行数据加载** - 同时加载工作流、节点、连线数据
+3. **数据转换** - 将API数据转换为画布可用的格式
+4. **画布渲染** - 在画布上重新绘制节点和连线
+
+### 数据转换逻辑
+```typescript
+// WorkflowNode -> CanvasNode
+canvasNodes.value = nodes.map(node => ({
+  id: node.id || 0,
+  type: 'CUSTOM' as any,
+  name: node.nodeName || '未命名节点',
+  description: '',
+  icon: getIconByType('CUSTOM'),
+  templateId: node.templateId || 0,
+  categoryId: 0,
+  x: node.positionX || 100,
+  y: node.positionY || 100,
+  config: node.nodeConfig ? JSON.parse(node.nodeConfig) : getDefaultConfig('CUSTOM'),
+  dbId: node.id // 保存数据库ID
+}))
+
+// WorkflowConnection -> Connection
+connections.value = workflowConnections.map(conn => ({
+  id: conn.id || 0,
+  sourceNodeId: conn.sourceNodeId,
+  targetNodeId: conn.targetNodeId,
+  type: (conn.connectionType || 'data') as ConnectionType
+}))
+```
+
+### 使用示例
+从流程管理页面跳转到编辑页面：
+```vue
+<template>
+  <el-button @click="editWorkflow(workflow.id)">编辑</el-button>
+</template>
+
+<script setup>
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
+
+const editWorkflow = (workflowId) => {
+  router.push(`/operator-designer/${workflowId}`)
+}
+</script>
 ```
 
 ## 使用方法
@@ -216,6 +280,14 @@ const apiCategories = ref<OperatorCategory[]>([])
   - 改善代码智能提示和错误检查
   - 重命名UI组件类型以避免与API类型冲突
 
+### 工作流加载功能
+- 添加时间：2024年
+- 主要功能：
+  - 支持路由参数自动加载工作流
+  - 并行加载工作流、节点、连线数据
+  - 数据转换和画布渲染
+  - 错误处理和用户反馈
+
 ## 性能优化
 
 ### 1. 连线优化
@@ -232,6 +304,11 @@ const apiCategories = ref<OperatorCategory[]>([])
 - 响应式数据优化
 - 事件监听器清理
 - 定时器管理
+
+### 4. 数据加载优化
+- 并行API调用
+- 数据缓存机制
+- 智能降级策略
 
 ## 开发指南
 
@@ -294,17 +371,6 @@ export function useNewFeature(): UseNewFeatureReturn {
    // 新版本
    import type { UIOperatorTemplate, UIOperatorCategory } from '@/views/OperatorDesigner/types'
    import type { OperatorTemplate, OperatorCategory } from '@/types/api'
-   ```
-
-2. 启用TypeScript类型检查：
-   ```typescript
-   // 获得完整的类型支持
-   const {
-     operatorCategories,
-     canvasNodes,
-     connections,
-     loadOperatorCategories
-   } = useWorkflowDesigner()
    ```
 
 ## 维护指南

@@ -132,6 +132,8 @@ export interface UseWorkflowDesignerReturn {
   showOperatorDetails: (operator: UIOperatorTemplate) => void
   getDefaultConfig: (type: string) => Record<string, any>
   loadOperatorCategories: () => Promise<void>
+  loadWorkflow: (workflowId: number) => Promise<void>
+  checkAndLoadWorkflow: () => Promise<void>
   findNearestConnectionPoint: (x: number, y: number, excludeNodeId?: number) => { node: CanvasNode; type: ConnectionPointType } | null
   canCreateConnection: (sourceNodeId: number, targetNodeId: number, sourceType: ConnectionPointType, targetType: ConnectionPointType, showWarning?: boolean) => boolean
   showConnectionError: (message: string, details?: string) => void
@@ -149,8 +151,8 @@ export interface UseConnectionManagerReturn {
   tempConnection: Ref<TempConnection>
   hoveredConnectionPoint: Ref<{ node: CanvasNode; type: ConnectionPointType } | null>
   startConnection: (event: MouseEvent, node: CanvasNode, type: ConnectionPointType) => void
-  endConnection: (event: MouseEvent, canvasElement: HTMLElement) => void
-  updateTempConnection: (event: MouseEvent, canvasElement: HTMLElement) => void
+  endConnection: (event: MouseEvent) => void
+  updateTempConnection: (event: MouseEvent) => void
   onConnectionPointEnter: (event: MouseEvent, node: CanvasNode, type: ConnectionPointType) => void
   onConnectionPointLeave: (event: MouseEvent, node: CanvasNode, type: ConnectionPointType) => void
   getConnectionPath: (connection: Connection) => string

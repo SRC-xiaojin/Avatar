@@ -159,7 +159,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, onMounted, onBeforeUnmount, watch } from 'vue'
 import { 
   Delete, 
   DocumentAdd, 
@@ -211,6 +211,8 @@ const {
   showOperatorDetails,
   getDefaultConfig,
   loadOperatorCategories,
+  loadWorkflow,
+  checkAndLoadWorkflow,
   findNearestConnectionPoint,
   canCreateConnection,
   showConnectionError,
@@ -339,11 +341,60 @@ const onKeyDown = (event) => {
   }
 }
 
+// 数据监控
+watch(
+  () => canvasNodes.value,
+  (newNodes, oldNodes) => {
+    console.log('🏠 index.vue - 画布节点数据变化:', {
+      新节点数量: newNodes.length,
+      旧节点数量: oldNodes?.length || 0,
+      新节点详情: newNodes.map(n => ({ id: n.id, name: n.name, x: n.x, y: n.y })),
+      当前工作流ID: currentWorkflowId.value
+    })
+    
+    // 触发视图更新
+    if (newNodes.length > 0) {
+      console.log('🔄 触发视图更新 - 节点数据已更新')
+    }
+  },
+  { deep: true, immediate: true }
+)
+
+watch(
+  () => connections.value,
+  (newConnections, oldConnections) => {
+    console.log('🏠 index.vue - 连线数据变化:', {
+      新连线数量: newConnections.length,
+      旧连线数量: oldConnections?.length || 0,
+      新连线详情: newConnections.map(c => ({ id: c.id, source: c.sourceNodeId, target: c.targetNodeId })),
+      当前工作流ID: currentWorkflowId.value
+    })
+    
+    // 触发视图更新
+    if (newConnections.length > 0) {
+      console.log('🔄 触发视图更新 - 连线数据已更新')
+    }
+  },
+  { deep: true, immediate: true }
+)
+
 // 生命周期钩子
 onMounted(async () => {
+  console.log('🚀 算子设计器开始初始化...')
+  console.log('📝 开始加载算子分类...')
   await loadOperatorCategories()
+  console.log('✅ 算子分类加载完成')
+  
+  console.log('🔍 开始检查并加载工作流...')
+  await checkAndLoadWorkflow() // 检查并加载工作流
+  console.log('✅ 工作流加载检查完成')
+  
   document.addEventListener('keydown', onKeyDown)
+  document.addEventListener('mousemove', onDocumentMouseMove)
+  document.addEventListener('mouseup', onDocumentMouseUp)
   addOperationLog('info', '算子设计器启动')
+  
+  console.log('🎉 算子设计器初始化完成')
 })
 
 onBeforeUnmount(() => {
