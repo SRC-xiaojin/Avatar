@@ -5,7 +5,7 @@ server:
 spring:
   # 数据源配置 - 开发环境
   datasource:
-    url: jdbc:mysql://192.168.0.25:3306/operator_choreography?useSSL=false&serverTimezone=UTC&characterEncoding=utf8
+    url: jdbc:mysql://192.168.2.107:3306/operator_orchestration?useSSL=false&serverTimezone=UTC&characterEncoding=utf8
     driver-class-name: com.mysql.cj.jdbc.Driver
     username: root
     password: 123456

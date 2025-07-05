@@ -12,6 +12,15 @@
       </div>
       <div class="header-right">
         <el-button 
+          type="info" 
+          @click="showConnectionHelp"
+          size="small"
+          title="连线帮助"
+        >
+          <el-icon><InfoFilled /></el-icon>
+          连线帮助
+        </el-button>
+        <el-button 
           type="primary" 
           @click="saveWorkflow"
           :loading="isSaving"
@@ -465,12 +474,20 @@
             <!-- 输入连接点 -->
             <div 
               class="connection-point input-point"
+              :class="{
+                'drawing-connection': tempConnection.isDrawing,
+                'can-connect': tempConnection.isDrawing && tempConnection.sourceNode && canCreateConnection(tempConnection.sourceNode.id, node.id, tempConnection.sourceType, 'input', false),
+                'cannot-connect': tempConnection.isDrawing && tempConnection.sourceNode && !canCreateConnection(tempConnection.sourceNode.id, node.id, tempConnection.sourceType, 'input', false)
+              }"
               :data-node-id="node.id"
               :data-type="'input'"
               @mousedown.stop="startConnection($event, node, 'input')"
+              @mouseenter="onConnectionPointEnter($event, node, 'input')"
+              @mouseleave="onConnectionPointLeave($event, node, 'input')"
               title="输入端口"
             >
               <div class="point-inner"></div>
+              <div class="point-hitarea" :data-node-id="node.id" :data-type="'input'"></div>
             </div>
             
             <div class="node-header" @mousedown.stop="startNodeDrag($event, node)">
@@ -496,12 +513,20 @@
             <!-- 输出连接点 -->
             <div 
               class="connection-point output-point"
+              :class="{
+                'drawing-connection': tempConnection.isDrawing,
+                'can-connect': tempConnection.isDrawing && tempConnection.sourceNode && canCreateConnection(tempConnection.sourceNode.id, node.id, tempConnection.sourceType, 'output', false),
+                'cannot-connect': tempConnection.isDrawing && tempConnection.sourceNode && !canCreateConnection(tempConnection.sourceNode.id, node.id, tempConnection.sourceType, 'output', false)
+              }"
               :data-node-id="node.id"
               :data-type="'output'"
               @mousedown.stop="startConnection($event, node, 'output')"
+              @mouseenter="onConnectionPointEnter($event, node, 'output')"
+              @mouseleave="onConnectionPointLeave($event, node, 'output')"
               title="输出端口"
             >
               <div class="point-inner"></div>
+              <div class="point-hitarea" :data-node-id="node.id" :data-type="'output'"></div>
             </div>
           </div>
         </div>
@@ -633,6 +658,87 @@
         </div>
       </template>
     </el-tooltip>
+
+    <!-- 连线调试面板 -->
+    <div v-if="showDebugPanel" class="debug-panel">
+      <div class="debug-header">
+        <h4>连线调试面板</h4>
+        <el-button size="small" @click="showDebugPanel = false">
+          <el-icon><Close /></el-icon>
+        </el-button>
+      </div>
+      <div class="debug-content">
+        <div class="debug-section">
+          <h5>连线状态</h5>
+          <div class="debug-item">
+            <span class="label">正在连线:</span>
+            <span class="value">{{ tempConnection.isDrawing ? '是' : '否' }}</span>
+          </div>
+          <div v-if="tempConnection.isDrawing" class="debug-item">
+            <span class="label">源节点:</span>
+            <span class="value">{{ tempConnection.sourceNode?.name }}</span>
+          </div>
+          <div v-if="tempConnection.isDrawing" class="debug-item">
+            <span class="label">连接类型:</span>
+            <span class="value">{{ tempConnection.sourceType }}</span>
+          </div>
+        </div>
+        
+        <div class="debug-section">
+          <h5>连接统计</h5>
+          <div class="debug-item">
+            <span class="label">节点数量:</span>
+            <span class="value">{{ canvasNodes.length }}</span>
+          </div>
+          <div class="debug-item">
+            <span class="label">连线数量:</span>
+            <span class="value">{{ connections.length }}</span>
+          </div>
+          <div class="debug-item">
+            <span class="label">选中节点:</span>
+            <span class="value">{{ selectedNode?.name || '无' }}</span>
+          </div>
+          <div class="debug-item">
+            <span class="label">选中连线:</span>
+            <span class="value">{{ selectedConnection ? `${getNodeName(selectedConnection.sourceNodeId)} → ${getNodeName(selectedConnection.targetNodeId)}` : '无' }}</span>
+          </div>
+        </div>
+        
+        <div class="debug-section">
+          <h5>连线列表</h5>
+          <div class="connections-list">
+            <div 
+              v-for="conn in connections" 
+              :key="conn.id"
+              class="connection-item"
+              :class="{ active: selectedConnection?.id === conn.id }"
+              @click="selectConnection(conn)"
+            >
+              <span class="connection-text">
+                {{ getNodeName(conn.sourceNodeId) }} → {{ getNodeName(conn.targetNodeId) }}
+              </span>
+              <el-button 
+                size="small" 
+                type="danger" 
+                link 
+                @click.stop="deleteConnection(conn)"
+              >
+                删除
+              </el-button>
+            </div>
+            <div v-if="connections.length === 0" class="no-connections">
+              暂无连线
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 调试面板开关 -->
+    <div class="debug-toggle" @click="showDebugPanel = !showDebugPanel">
+      <el-icon><Tools /></el-icon>
+      <span>调试</span>
+    </div>
   </div>
 </template>
 
@@ -725,6 +831,12 @@ const connectionTooltip = ref(null)
 const currentWorkflowId = ref(null)
 const isSaving = ref(false)
 
+// 调试面板相关状态
+const showDebugPanel = ref(false)
+
+// 连接点悬停状态
+const hoveredConnectionPoint = ref(null)
+
 // 图标映射
 const iconMap = {
   'DATA_PROCESSING': 'DataBoard',
@@ -737,6 +849,7 @@ const iconMap = {
 // 加载工作流数据
 const loadWorkflowData = async (workflowId) => {
   try {
+    console.log('开始加载工作流数据:', { workflowId })
     ElMessage.info('正在加载工作流数据...')
     
     // 并行获取工作流基本信息、节点和连线
@@ -746,7 +859,16 @@ const loadWorkflowData = async (workflowId) => {
       connectionApi.getConnectionsByWorkflow(workflowId)
     ])
     
+    console.log('工作流数据获取结果:', {
+      工作流响应: workflowResponse.success,
+      节点响应: nodesResponse.success,
+      连线响应: connectionsResponse.success,
+      节点数量: nodesResponse.data?.length || 0,
+      连线数量: connectionsResponse.data?.length || 0
+    })
+    
     if (!workflowResponse.success) {
+      console.error('获取工作流信息失败:', workflowResponse.message)
       ElMessage.error('获取工作流信息失败')
       return
     }
@@ -1042,16 +1164,55 @@ const onCanvasClick = (event) => {
 }
 
 const removeNode = (nodeId) => {
+  const nodeToRemove = canvasNodes.value.find(n => n.id === nodeId)
+  if (!nodeToRemove) {
+    console.warn('尝试删除不存在的节点:', nodeId)
+    return
+  }
+  
+  // 查找相关连线
+  const relatedConnections = connections.value.filter(
+    conn => conn.sourceNodeId === nodeId || conn.targetNodeId === nodeId
+  )
+  
+  console.log('删除节点:', {
+    节点ID: nodeId,
+    节点名称: nodeToRemove.name,
+    相关连线数量: relatedConnections.length,
+    相关连线: relatedConnections.map(conn => ({
+      id: conn.id,
+      from: canvasNodes.value.find(n => n.id === conn.sourceNodeId)?.name,
+      to: canvasNodes.value.find(n => n.id === conn.targetNodeId)?.name
+    }))
+  })
+  
   const index = canvasNodes.value.findIndex(n => n.id === nodeId)
   if (index !== -1) {
     canvasNodes.value.splice(index, 1)
     if (selectedNode.value?.id === nodeId) {
       selectedNode.value = null
     }
+    
     // 删除相关连线
+    const originalConnectionCount = connections.value.length
     connections.value = connections.value.filter(
       conn => conn.sourceNodeId !== nodeId && conn.targetNodeId !== nodeId
     )
+    
+    const deletedConnectionCount = originalConnectionCount - connections.value.length
+    
+    console.log('节点删除成功:', {
+      删除的节点: nodeToRemove.name,
+      删除的连线数量: deletedConnectionCount,
+      剩余节点数量: canvasNodes.value.length,
+      剩余连接数量: connections.value.length
+    })
+    
+    ElMessage.success({
+      message: `已删除节点: ${nodeToRemove.name}${deletedConnectionCount > 0 ? ` (同时删除了 ${deletedConnectionCount} 条相关连线)` : ''}`,
+      duration: 3000,
+      showClose: true
+    })
   }
 }
 
@@ -1059,6 +1220,13 @@ const removeNode = (nodeId) => {
 const startConnection = (event, node, type) => {
   event.preventDefault()
   const rect = canvasRef.value.getBoundingClientRect()
+  
+  console.log('开始连线:', {
+    节点ID: node.id,
+    节点名称: node.name,
+    连接类型: type,
+    鼠标位置: { x: event.clientX - rect.left, y: event.clientY - rect.top }
+  })
   
   tempConnection.value = {
     isDrawing: true,
@@ -1070,6 +1238,8 @@ const startConnection = (event, node, type) => {
     currentY: event.clientY - rect.top
   }
   
+  ElMessage.info(`开始从 ${node.name} 的${type === 'output' ? '输出' : '输入'}端口连线`)
+  
   // 阻止节点选择
   event.stopPropagation()
 }
@@ -1077,8 +1247,38 @@ const startConnection = (event, node, type) => {
 const onCanvasMouseMove = (event) => {
   if (tempConnection.value.isDrawing) {
     const rect = canvasRef.value.getBoundingClientRect()
-    tempConnection.value.currentX = event.clientX - rect.left
-    tempConnection.value.currentY = event.clientY - rect.top
+    const newX = event.clientX - rect.left
+    const newY = event.clientY - rect.top
+    
+    // 检查鼠标是否在连接点上
+    const target = event.target
+    const isOnConnectionPoint = target.classList.contains('connection-point') || 
+                               target.classList.contains('point-inner') || 
+                               target.getAttribute('data-node-id')
+    
+    if (isOnConnectionPoint) {
+      const nodeId = target.getAttribute('data-node-id')
+      const type = target.getAttribute('data-type')
+      if (nodeId && type) {
+        const targetNode = canvasNodes.value.find(n => n.id === parseInt(nodeId))
+        if (targetNode) {
+                   console.log('鼠标悬停在连接点:', {
+           目标节点: targetNode.name,
+           连接类型: type,
+           可连接性: canCreateConnection(
+             tempConnection.value.sourceNode.id,
+             parseInt(nodeId),
+             tempConnection.value.sourceType,
+             type,
+             false // 不显示警告消息
+           )
+         })
+        }
+      }
+    }
+    
+    tempConnection.value.currentX = newX
+    tempConnection.value.currentY = newY
   }
   
   // 处理节点拖拽
@@ -1104,19 +1304,100 @@ const onCanvasMouseMove = (event) => {
 const onCanvasMouseUp = (event) => {
   // 处理连线结束
   if (tempConnection.value.isDrawing) {
-    // 检查是否在连接点上释放
+    console.log('连线结束，检查目标:', {
+      目标元素: event.target,
+      目标类名: event.target.className,
+      源节点: tempConnection.value.sourceNode?.name,
+      源类型: tempConnection.value.sourceType
+    })
+    
+    // 检查是否在连接点上释放 - 改进版本
     const target = event.target
-    const nodeId = target.getAttribute('data-node-id')
-    const type = target.getAttribute('data-type')
+    let nodeId = target.getAttribute('data-node-id')
+    let type = target.getAttribute('data-type')
+    
+    // 如果直接检测失败，尝试通过鼠标位置检测最近的连接点
+    if (!nodeId || !type) {
+      const rect = canvasRef.value.getBoundingClientRect()
+      const mouseX = event.clientX - rect.left
+      const mouseY = event.clientY - rect.top
+      
+      const nearestConnectionPoint = findNearestConnectionPoint(mouseX, mouseY)
+      if (nearestConnectionPoint) {
+        nodeId = nearestConnectionPoint.nodeId.toString()
+        type = nearestConnectionPoint.type
+        
+        console.log('通过位置检测找到连接点:', {
+          检测到的节点ID: nodeId,
+          检测到的类型: type,
+          距离: nearestConnectionPoint.distance,
+          鼠标位置: { x: mouseX, y: mouseY }
+        })
+      }
+    }
+    
+    console.log('连线目标检查:', {
+      目标节点ID: nodeId,
+      目标类型: type,
+      目标元素标签: target.tagName,
+      目标元素类名: target.className,
+      检测方式: nodeId && type ? (target.getAttribute('data-node-id') ? '直接检测' : '位置检测') : '未检测到'
+    })
     
     if (nodeId && type && tempConnection.value.sourceNode) {
       const targetNodeId = parseInt(nodeId)
       const sourceNodeId = tempConnection.value.sourceNode.id
+      const sourceNode = canvasNodes.value.find(n => n.id === sourceNodeId)
+      const targetNode = canvasNodes.value.find(n => n.id === targetNodeId)
+      
+      console.log('连线验证:', {
+        源节点: { id: sourceNodeId, name: sourceNode?.name },
+        目标节点: { id: targetNodeId, name: targetNode?.name },
+        源类型: tempConnection.value.sourceType,
+        目标类型: type
+      })
       
       // 验证连接规则
       if (canCreateConnection(sourceNodeId, targetNodeId, tempConnection.value.sourceType, type)) {
         createConnection(sourceNodeId, targetNodeId, tempConnection.value.sourceType, type)
       }
+    } else {
+      // 连线失败的详细提示
+      let failureReason = '连线失败'
+      let detailedMessage = '连线失败'
+      
+      if (!nodeId && !type) {
+        failureReason = '未在有效的连接点上释放鼠标'
+        detailedMessage = '请将鼠标精确拖拽到目标节点的连接点上释放\n\n💡 提示：\n• 输入端口在节点左侧\n• 输出端口在节点右侧\n• 连接点会在靠近时变色提示'
+        console.warn('连线失败: 未找到目标节点ID和类型')
+      } else if (!nodeId) {
+        failureReason = '未检测到目标节点'
+        detailedMessage = '无法识别目标节点，请确保拖拽到节点的连接点上'
+        console.warn('连线失败: 未找到目标节点ID')
+      } else if (!type) {
+        failureReason = '连接点类型无效'
+        detailedMessage = '无法识别连接点类型，请确保拖拽到正确的连接点上'
+        console.warn('连线失败: 未找到目标连接点类型')
+      } else if (!tempConnection.value.sourceNode) {
+        failureReason = '源节点信息丢失'
+        detailedMessage = '连线过程中源节点信息丢失，请重新开始连线'
+        console.warn('连线失败: 源节点信息丢失')
+      }
+      
+      ElMessage.warning({
+        message: detailedMessage,
+        duration: 5000,
+        showClose: true
+      })
+      
+      console.log('连线失败详情:', {
+        原因: failureReason,
+        目标节点ID: nodeId,
+        目标类型: type,
+        源节点: tempConnection.value.sourceNode?.name,
+        鼠标位置: { x: event.clientX, y: event.clientY },
+        检测到的最近连接点: findNearestConnectionPoint(event.clientX - canvasRef.value.getBoundingClientRect().left, event.clientY - canvasRef.value.getBoundingClientRect().top)
+      })
     }
     
     // 重置临时连线状态
@@ -1129,6 +1410,8 @@ const onCanvasMouseUp = (event) => {
       currentX: 0,
       currentY: 0
     }
+    
+    console.log('连线状态已重置')
   }
   
   // 处理节点拖拽结束
@@ -1142,16 +1425,42 @@ const onCanvasMouseUp = (event) => {
   }
 }
 
-const canCreateConnection = (sourceNodeId, targetNodeId, sourceType, targetType) => {
+const canCreateConnection = (sourceNodeId, targetNodeId, sourceType, targetType, showWarning = true) => {
+  const sourceNode = canvasNodes.value.find(n => n.id === sourceNodeId)
+  const targetNode = canvasNodes.value.find(n => n.id === targetNodeId)
+  
+  console.log('验证连接规则:', {
+    源节点: { id: sourceNodeId, name: sourceNode?.name, type: sourceType },
+    目标节点: { id: targetNodeId, name: targetNode?.name, type: targetType },
+    当前连接数: connections.value.length,
+    显示警告: showWarning
+  })
+  
   // 不能连接自己
   if (sourceNodeId === targetNodeId) {
-    ElMessage.warning('不能连接节点自身')
+    const message = `不能连接节点自身 (${sourceNode?.name})`
+    console.warn('连线验证失败:', message)
+    if (showWarning) {
+      ElMessage.warning({
+        message: message,
+        duration: 3000,
+        showClose: true
+      })
+    }
     return false
   }
   
   // 输出只能连接输入，输入只能连接输出
   if (sourceType === targetType) {
-    ElMessage.warning('只能从输出端口连接到输入端口')
+    const message = `连接类型错误: ${sourceType} → ${targetType}，只能从输出端口连接到输入端口`
+    console.warn('连线验证失败:', message)
+    if (showWarning) {
+      ElMessage.warning({
+        message: '只能从输出端口连接到输入端口',
+        duration: 3000,
+        showClose: true
+      })
+    }
     return false
   }
   
@@ -1163,10 +1472,19 @@ const canCreateConnection = (sourceNodeId, targetNodeId, sourceType, targetType)
   )
   
   if (existingConnection) {
-    ElMessage.warning('节点之间已存在连接')
+    const message = `节点之间已存在连接: ${sourceNode?.name} ↔ ${targetNode?.name}`
+    console.warn('连线验证失败:', message)
+    if (showWarning) {
+      ElMessage.warning({
+        message: `${sourceNode?.name} 和 ${targetNode?.name} 之间已存在连接`,
+        duration: 3000,
+        showClose: true
+      })
+    }
     return false
   }
   
+  console.log('连线验证通过')
   return true
 }
 
@@ -1181,6 +1499,16 @@ const createConnection = (sourceNodeId, targetNodeId, sourceType, targetType) =>
     finalTargetId = sourceNodeId
   }
   
+  const sourceNode = canvasNodes.value.find(n => n.id === finalSourceId)
+  const targetNode = canvasNodes.value.find(n => n.id === finalTargetId)
+  
+  console.log('创建连接:', {
+    源节点: { id: finalSourceId, name: sourceNode?.name },
+    目标节点: { id: finalTargetId, name: targetNode?.name },
+    原始连接方向: { sourceType, targetType },
+    连接ID: nextConnectionId.value
+  })
+  
   const newConnection = {
     id: nextConnectionId.value++,
     sourceNodeId: finalSourceId,
@@ -1190,9 +1518,21 @@ const createConnection = (sourceNodeId, targetNodeId, sourceType, targetType) =>
   
   connections.value.push(newConnection)
   
-  const sourceNode = canvasNodes.value.find(n => n.id === finalSourceId)
-  const targetNode = canvasNodes.value.find(n => n.id === finalTargetId)
-  ElMessage.success(`已连接: ${sourceNode.name} → ${targetNode.name}`)
+  console.log('连接创建成功:', {
+    连接: newConnection,
+    当前连接总数: connections.value.length,
+    所有连接: connections.value.map(conn => ({
+      id: conn.id,
+      from: canvasNodes.value.find(n => n.id === conn.sourceNodeId)?.name,
+      to: canvasNodes.value.find(n => n.id === conn.targetNodeId)?.name
+    }))
+  })
+  
+  ElMessage.success({
+    message: `连接成功: ${sourceNode.name} → ${targetNode.name}`,
+    duration: 3000,
+    showClose: true
+  })
 }
 
 const getNodeCenter = (nodeId) => {
@@ -1372,11 +1712,36 @@ const getConnectionColor = (connection) => {
 
 const deleteSelectedConnection = () => {
   if (selectedConnection.value) {
+    const connection = selectedConnection.value
+    const sourceNode = canvasNodes.value.find(n => n.id === connection.sourceNodeId)
+    const targetNode = canvasNodes.value.find(n => n.id === connection.targetNodeId)
+    
+    console.log('删除连接:', {
+      连接ID: connection.id,
+      源节点: sourceNode?.name,
+      目标节点: targetNode?.name,
+      删除前连接总数: connections.value.length
+    })
+    
     const index = connections.value.findIndex(c => c.id === selectedConnection.value.id)
     if (index !== -1) {
       connections.value.splice(index, 1)
       selectedConnection.value = null
-      ElMessage.success('已删除连接')
+      
+      console.log('连接删除成功:', {
+        删除后连接总数: connections.value.length,
+        剩余连接: connections.value.map(conn => ({
+          id: conn.id,
+          from: canvasNodes.value.find(n => n.id === conn.sourceNodeId)?.name,
+          to: canvasNodes.value.find(n => n.id === conn.targetNodeId)?.name
+        }))
+      })
+      
+      ElMessage.success({
+        message: `已删除连接: ${sourceNode?.name} → ${targetNode?.name}`,
+        duration: 3000,
+        showClose: true
+      })
     }
   }
 }
@@ -1386,11 +1751,13 @@ const startNodeDrag = (event, node) => {
   // 如果点击的是连接点，不启动节点拖拽
   if (event.target.classList.contains('connection-point') || 
       event.target.classList.contains('point-inner')) {
+    console.log('点击了连接点，不启动节点拖拽')
     return
   }
   
   // 如果点击的是删除按钮，不启动拖拽
   if (event.target.closest('.node-delete')) {
+    console.log('点击了删除按钮，不启动节点拖拽')
     return
   }
   
@@ -1398,6 +1765,13 @@ const startNodeDrag = (event, node) => {
   event.stopPropagation()
   
   const rect = canvasRef.value.getBoundingClientRect()
+  
+  console.log('开始拖拽节点:', {
+    节点ID: node.id,
+    节点名称: node.name,
+    初始位置: { x: node.x, y: node.y },
+    鼠标位置: { x: event.clientX - rect.left, y: event.clientY - rect.top }
+  })
   
   draggingNode.value = node
   nodeDragState.value = {
@@ -1440,6 +1814,17 @@ const onDocumentMouseMove = (event) => {
 // 全局鼠标释放事件处理
 const onDocumentMouseUp = () => {
   if (nodeDragState.value.isDragging) {
+    const draggedNode = draggingNode.value
+    console.log('节点拖拽结束:', {
+      节点ID: draggedNode?.id,
+      节点名称: draggedNode?.name,
+      最终位置: { x: draggedNode?.x, y: draggedNode?.y },
+      拖拽距离: {
+        x: Math.abs((draggedNode?.x || 0) - nodeDragState.value.nodeStartX),
+        y: Math.abs((draggedNode?.y || 0) - nodeDragState.value.nodeStartY)
+      }
+    })
+    
     nodeDragState.value.isDragging = false
     draggingNode.value = null
     
@@ -1447,6 +1832,124 @@ const onDocumentMouseUp = () => {
     document.removeEventListener('mousemove', onDocumentMouseMove)
     document.removeEventListener('mouseup', onDocumentMouseUp)
   }
+}
+
+// 从调试面板删除连线
+const deleteConnection = (connection) => {
+  const sourceNode = canvasNodes.value.find(n => n.id === connection.sourceNodeId)
+  const targetNode = canvasNodes.value.find(n => n.id === connection.targetNodeId)
+  
+  console.log('从调试面板删除连接:', {
+    连接ID: connection.id,
+    源节点: sourceNode?.name,
+    目标节点: targetNode?.name
+  })
+  
+  const index = connections.value.findIndex(c => c.id === connection.id)
+  if (index !== -1) {
+    connections.value.splice(index, 1)
+    if (selectedConnection.value?.id === connection.id) {
+      selectedConnection.value = null
+    }
+    
+    ElMessage.success({
+      message: `已删除连接: ${sourceNode?.name} → ${targetNode?.name}`,
+      duration: 2000
+    })
+  }
+}
+
+// 查找最近的连接点 - 智能检测
+const findNearestConnectionPoint = (mouseX, mouseY) => {
+  const maxDistance = 50 // 最大检测距离
+  let nearestPoint = null
+  let minDistance = Infinity
+  
+  // 遍历所有节点的连接点
+  canvasNodes.value.forEach(node => {
+    // 计算输入连接点位置
+    const inputX = node.x - 8
+    const inputY = node.y + 60
+    const inputDistance = Math.sqrt(Math.pow(mouseX - inputX, 2) + Math.pow(mouseY - inputY, 2))
+    
+    // 计算输出连接点位置
+    const outputX = node.x + 200 + 8
+    const outputY = node.y + 60
+    const outputDistance = Math.sqrt(Math.pow(mouseX - outputX, 2) + Math.pow(mouseY - outputY, 2))
+    
+    // 检查输入连接点
+    if (inputDistance < maxDistance && inputDistance < minDistance) {
+      minDistance = inputDistance
+      nearestPoint = {
+        nodeId: node.id,
+        type: 'input',
+        distance: inputDistance,
+        x: inputX,
+        y: inputY
+      }
+    }
+    
+    // 检查输出连接点
+    if (outputDistance < maxDistance && outputDistance < minDistance) {
+      minDistance = outputDistance
+      nearestPoint = {
+        nodeId: node.id,
+        type: 'output',
+        distance: outputDistance,
+        x: outputX,
+        y: outputY
+      }
+    }
+  })
+  
+  return nearestPoint
+}
+
+// 连接点悬停事件
+const onConnectionPointEnter = (event, node, type) => {
+  hoveredConnectionPoint.value = {
+    nodeId: node.id,
+    type: type,
+    node: node
+  }
+  
+  console.log('连接点悬停:', {
+    节点: node.name,
+    类型: type,
+    正在连线: tempConnection.value.isDrawing
+  })
+  
+  // 如果正在连线，检查是否可以连接
+  if (tempConnection.value.isDrawing && tempConnection.value.sourceNode) {
+    const canConnect = canCreateConnection(
+      tempConnection.value.sourceNode.id,
+      node.id,
+      tempConnection.value.sourceType,
+      type,
+      false // 不显示警告消息
+    )
+    
+    // 添加视觉反馈
+    event.target.classList.toggle('can-connect', canConnect)
+    event.target.classList.toggle('cannot-connect', !canConnect)
+    
+    if (canConnect) {
+      ElMessage.info({
+        message: `可连接: ${tempConnection.value.sourceNode.name} → ${node.name}`,
+        duration: 1000
+      })
+    }
+  }
+}
+
+// 连接点离开事件
+const onConnectionPointLeave = (event, node, type) => {
+  if (hoveredConnectionPoint.value?.nodeId === node.id && hoveredConnectionPoint.value?.type === type) {
+    hoveredConnectionPoint.value = null
+  }
+  
+  // 移除视觉反馈类
+  event.target.classList.remove('can-connect', 'cannot-connect')
 }
 
 // 保存工作流
@@ -1572,6 +2075,15 @@ const saveWorkflow = async () => {
 // 清空画布
 const clearCanvas = async () => {
   try {
+    const nodeCount = canvasNodes.value.length
+    const connectionCount = connections.value.length
+    
+    console.log('准备清空画布:', {
+      当前节点数: nodeCount,
+      当前连接数: connectionCount,
+      工作流ID: currentWorkflowId.value
+    })
+    
     await ElMessageBox.confirm(
       '确定要清空画布吗？此操作将删除所有节点和连接关系，且无法恢复。',
       '确认清空',
@@ -1595,10 +2107,22 @@ const clearCanvas = async () => {
     nextNodeId.value = 1
     nextConnectionId.value = 1
     
-    ElMessage.success('画布已清空')
+    console.log('画布清空成功:', {
+      清空前节点数: nodeCount,
+      清空前连接数: connectionCount,
+      清空后节点数: canvasNodes.value.length,
+      清空后连接数: connections.value.length
+    })
+    
+    ElMessage.success({
+      message: `画布已清空 (删除了 ${nodeCount} 个节点, ${connectionCount} 条连接)`,
+      duration: 3000,
+      showClose: true
+    })
   } catch (error) {
     // 用户取消操作
     if (error === 'cancel') {
+      console.log('用户取消清空操作')
       ElMessage.info('已取消清空操作')
     }
   }
@@ -1746,6 +2270,63 @@ const handleKeyDown = (event) => {
   if (event.key === 'Delete' && selectedConnection.value) {
     deleteSelectedConnection()
   }
+}
+
+// 显示连线帮助
+const showConnectionHelp = () => {
+  ElMessageBox.alert(
+    `
+    <div style="text-align: left; line-height: 1.6;">
+      <h4 style="margin: 0 0 16px 0; color: #409eff;">连线操作指南</h4>
+      
+      <div style="margin-bottom: 16px;">
+        <strong>如何连线：</strong>
+        <ol style="margin: 8px 0; padding-left: 20px;">
+          <li>将鼠标悬停在节点上，会显示输入/输出连接点</li>
+          <li>从输出端口（右侧圆点）拖拽到输入端口（左侧圆点）</li>
+          <li>连线过程中，所有连接点都会显示，可连接的点会变绿色</li>
+          <li>在目标连接点上释放鼠标完成连线</li>
+        </ol>
+      </div>
+      
+      <div style="margin-bottom: 16px;">
+        <strong>连线规则：</strong>
+        <ul style="margin: 8px 0; padding-left: 20px;">
+          <li>只能从输出端口连接到输入端口</li>
+          <li>不能连接节点自身</li>
+          <li>两个节点之间只能有一条连线</li>
+        </ul>
+      </div>
+      
+      <div style="margin-bottom: 16px;">
+        <strong>连线失败原因：</strong>
+        <ul style="margin: 8px 0; padding-left: 20px;">
+          <li>未在有效的连接点上释放鼠标</li>
+          <li>连接类型不匹配（如输入连输入）</li>
+          <li>节点间已存在连接</li>
+        </ul>
+      </div>
+      
+              <div style="margin-bottom: 16px;">
+          <strong>调试技巧：</strong>
+          <ul style="margin: 8px 0; padding-left: 20px;">
+            <li>点击右侧"调试"按钮打开调试面板</li>
+            <li>查看浏览器控制台获取详细日志</li>
+            <li>使用Delete键删除选中的连线</li>
+            <li>连接点感应区域已扩大，更容易连接</li>
+            <li>连线时注意颜色提示：绿色可连接，红色不可连接</li>
+            <li>连线失败时会显示详细的失败原因</li>
+          </ul>
+        </div>
+    </div>
+    `,
+    '连线帮助',
+    {
+      confirmButtonText: '我知道了',
+      dangerouslyUseHTMLString: true,
+      customClass: 'connection-help-dialog'
+    }
+  )
 }
 
 // 组件挂载时加载数据
@@ -2268,59 +2849,164 @@ onBeforeUnmount(() => {
   z-index: 2;
 }
 
-/* 连接点样式 */
+/* 连接点样式 - 改进版 */
 .connection-point {
   position: absolute;
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: #409eff;
-  border: 2px solid white;
+  border: 3px solid white;
   cursor: crosshair;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
   z-index: 3;
   opacity: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.2);
 }
 
-.canvas-node:hover .connection-point {
+.canvas-node:hover .connection-point,
+.connection-point.drawing-connection {
   opacity: 1;
 }
 
 .connection-point:hover {
   background: #1890ff;
-  transform: scale(1.2);
-  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.4);
+  transform: scale(1.3);
+  box-shadow: 0 4px 16px rgba(24, 144, 255, 0.6);
+  border-color: #ffffff;
+  border-width: 4px;
 }
 
 .connection-point.input-point {
-  left: -8px;
+  left: -10px;
   top: 50%;
   transform: translateY(-50%);
 }
 
 .connection-point.output-point {
-  right: -8px;
+  right: -10px;
   top: 50%;
   transform: translateY(-50%);
 }
 
 .connection-point.output-point:hover {
-  transform: translateY(-50%) scale(1.2);
+  transform: translateY(-50%) scale(1.3);
 }
 
 .connection-point.input-point:hover {
-  transform: translateY(-50%) scale(1.2);
+  transform: translateY(-50%) scale(1.3);
 }
 
+/* 连接点内部圆点 */
 .point-inner {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
   background: white;
   border-radius: 50%;
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
+  transition: all 0.2s ease;
+  z-index: 4;
+}
+
+.connection-point:hover .point-inner {
+  width: 10px;
+  height: 10px;
+  background: #ffffff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+}
+
+/* 连接点感应区域 */
+.point-hitarea {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 5;
+  background: transparent;
+  cursor: crosshair;
+}
+
+/* 连接点状态反馈 */
+.connection-point.can-connect {
+  background: #52c41a;
+  border-color: #ffffff;
+  box-shadow: 0 0 20px rgba(82, 196, 26, 0.8);
+  animation: pulse-connect 1s ease-in-out infinite;
+}
+
+.connection-point.cannot-connect {
+  background: #f56c6c;
+  border-color: #ffffff;
+  box-shadow: 0 0 20px rgba(245, 108, 108, 0.8);
+  animation: pulse-warning 1s ease-in-out infinite;
+}
+
+@keyframes pulse-connect {
+  0%, 100% {
+    transform: translateY(-50%) scale(1.3);
+    box-shadow: 0 0 20px rgba(82, 196, 26, 0.8);
+  }
+  50% {
+    transform: translateY(-50%) scale(1.5);
+    box-shadow: 0 0 30px rgba(82, 196, 26, 1);
+  }
+}
+
+@keyframes pulse-warning {
+  0%, 100% {
+    transform: translateY(-50%) scale(1.3);
+    box-shadow: 0 0 20px rgba(245, 108, 108, 0.8);
+  }
+  50% {
+    transform: translateY(-50%) scale(1.5);
+    box-shadow: 0 0 30px rgba(245, 108, 108, 1);
+  }
+}
+
+/* 正在连线时的连接点状态 */
+.connection-point.drawing-connection {
+  opacity: 1;
+  transform: scale(1.1);
+  box-shadow: 0 0 15px rgba(64, 158, 255, 0.5);
+  animation: drawing-pulse 1.5s ease-in-out infinite;
+}
+
+.connection-point.drawing-connection.input-point {
+  transform: translateY(-50%) scale(1.1);
+}
+
+.connection-point.drawing-connection.output-point {
+  transform: translateY(-50%) scale(1.1);
+}
+
+/* 连线时的脉动效果 */
+@keyframes drawing-pulse {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(64, 158, 255, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(64, 158, 255, 0.7);
+  }
+}
+
+/* 连线过程中的节点高亮 */
+.canvas-node.connection-target {
+  border-color: #52c41a;
+  box-shadow: 0 0 20px rgba(82, 196, 26, 0.4);
+}
+
+.canvas-node.connection-invalid {
+  border-color: #f56c6c;
+  box-shadow: 0 0 20px rgba(245, 108, 108, 0.4);
 }
 
 .canvas-node:hover {
@@ -2457,6 +3143,216 @@ onBeforeUnmount(() => {
   color: #e6a23c;
 }
 
+/* 调试面板样式 */
+.debug-panel {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  width: 350px;
+  max-height: 600px;
+  background: white;
+  border: 1px solid #e6e6e6;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+}
+
+.debug-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 12px 12px 0 0;
+}
+
+.debug-header h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.debug-content {
+  padding: 16px;
+  max-height: 520px;
+  overflow-y: auto;
+}
+
+.debug-section {
+  margin-bottom: 20px;
+}
+
+.debug-section h5 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #606266;
+  border-bottom: 1px solid #f0f0f0;
+  padding-bottom: 8px;
+}
+
+.debug-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.debug-item .label {
+  color: #909399;
+  font-weight: 500;
+}
+
+.debug-item .value {
+  color: #303133;
+  font-weight: 600;
+  text-align: right;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connections-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  background: #f8f9fa;
+}
+
+.connection-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e4e7ed;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.connection-item:last-child {
+  border-bottom: none;
+}
+
+.connection-item:hover {
+  background: #e6f7ff;
+}
+
+.connection-item.active {
+  background: #1890ff;
+  color: white;
+}
+
+.connection-item.active .connection-text {
+  color: white;
+}
+
+.connection-text {
+  font-size: 13px;
+  color: #303133;
+  font-weight: 500;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.no-connections {
+  padding: 20px;
+  text-align: center;
+  color: #909399;
+  font-size: 13px;
+}
+
+.debug-toggle {
+  position: fixed;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  background: #409eff;
+  color: white;
+  padding: 12px 8px;
+  border-radius: 12px 0 0 12px;
+  cursor: pointer;
+  z-index: 999;
+  transition: all 0.3s ease;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+  writing-mode: vertical-lr;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.debug-toggle:hover {
+  background: #1890ff;
+  transform: translateY(-50%) translateX(-5px);
+  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.2);
+}
+
+.debug-toggle .el-icon {
+  font-size: 16px;
+}
+
+.debug-toggle span {
+  writing-mode: vertical-lr;
+  text-orientation: mixed;
+}
+
+/* 调试面板响应式 */
+@media (max-width: 768px) {
+  .debug-panel {
+    width: 90%;
+    right: 5%;
+    top: 70px;
+  }
+  
+  .debug-toggle {
+    display: none;
+  }
+}
+
+/* 帮助对话框样式 */
+:deep(.connection-help-dialog) {
+  max-width: 600px;
+}
+
+:deep(.connection-help-dialog .el-message-box__message) {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+:deep(.connection-help-dialog h4) {
+  margin: 0 0 16px 0;
+  color: #409eff;
+  font-size: 18px;
+  font-weight: 600;
+  text-align: center;
+  border-bottom: 2px solid #409eff;
+  padding-bottom: 8px;
+}
+
+:deep(.connection-help-dialog strong) {
+  color: #303133;
+  font-weight: 600;
+}
+
+:deep(.connection-help-dialog ol),
+:deep(.connection-help-dialog ul) {
+  color: #606266;
+}
+
+:deep(.connection-help-dialog li) {
+  margin-bottom: 4px;
+}
+
 /* 响应式设计 */
 @media (max-width: 1200px) {
   .operator-panel {
@@ -2483,6 +3379,5 @@ onBeforeUnmount(() => {
     height: 400px;
   }
 }
-
 
 </style> 
