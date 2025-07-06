@@ -4,16 +4,17 @@
     :title="title"
     :width="width"
     :before-close="handleClose"
-    :class="['draggable-dialog', { 'is-dragging': isDragging }]"
+    :class="['draggable-dialog']"
+    draggable="true"
     append-to-body
     destroy-on-close
   >
+    <!-- 标题栏插槽 -->
     <template #header="{ titleId, titleClass }">
       <div
         :id="titleId"
         :class="titleClass"
         class="draggable-header"
-        @mousedown="handleMouseDown"
       >
         <span class="dialog-title">{{ title }}</span>
         <div class="header-actions">
@@ -22,10 +23,12 @@
       </div>
     </template>
 
+    <!-- 内容插槽 -->
     <div class="dialog-content">
       <slot></slot>
     </div>
 
+    <!-- 底部插槽 -->
     <template #footer v-if="$slots.footer">
       <slot name="footer"></slot>
     </template>
@@ -33,7 +36,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick } from 'vue'
+import { computed } from 'vue'
 
 interface Props {
   modelValue: boolean
@@ -61,10 +64,6 @@ const visible = computed({
   set: (value: boolean) => emit('update:modelValue', value)
 })
 
-const isDragging = ref(false)
-let startX = 0
-let startY = 0
-let dialogElement: HTMLElement | null = null
 
 const handleClose = (done: () => void) => {
   if (props.beforeClose) {
@@ -73,84 +72,6 @@ const handleClose = (done: () => void) => {
     done()
     emit('close')
   }
-}
-
-const handleMouseDown = (e: MouseEvent) => {
-  // 只有点击标题栏时才启用拖拽
-  if ((e.target as Element)?.closest('.header-actions')) return
-
-  isDragging.value = true
-  startX = e.clientX
-  startY = e.clientY
-
-  // 获取对话框元素
-  nextTick(() => {
-    const dialogWrapper = document.querySelector('.draggable-dialog .el-dialog') as HTMLElement
-    if (dialogWrapper) {
-      dialogElement = dialogWrapper
-      
-      // 设置初始transform如果没有的话
-      if (!dialogElement.style.transform) {
-        dialogElement.style.transform = 'translate(0px, 0px)'
-      }
-      
-      // 添加拖拽样式
-      dialogElement.style.cursor = 'move'
-      dialogElement.style.userSelect = 'none'
-      
-      document.addEventListener('mousemove', handleMouseMove)
-      document.addEventListener('mouseup', handleMouseUp)
-    }
-  })
-
-  e.preventDefault()
-}
-
-const handleMouseMove = (e: MouseEvent) => {
-  if (!isDragging.value || !dialogElement) return
-
-  const deltaX = e.clientX - startX
-  const deltaY = e.clientY - startY
-
-  // 获取当前的transform值
-  const currentTransform = dialogElement.style.transform
-  const match = currentTransform.match(/translate\((-?\d+)px,\s*(-?\d+)px\)/)
-  
-  let currentX = 0
-  let currentY = 0
-  if (match) {
-    currentX = parseInt(match[1])
-    currentY = parseInt(match[2])
-  }
-
-  const newX = currentX + deltaX
-  const newY = currentY + deltaY
-
-  // 限制拖拽范围，防止拖出屏幕
-  const maxX = (window.innerWidth - dialogElement.offsetWidth) / 2
-  const maxY = (window.innerHeight - dialogElement.offsetHeight) / 2
-  const minX = -maxX
-  const minY = -maxY
-
-  const constrainedX = Math.max(minX, Math.min(maxX, newX))
-  const constrainedY = Math.max(minY, Math.min(maxY, newY))
-
-  dialogElement.style.transform = `translate(${constrainedX}px, ${constrainedY}px)`
-
-  startX = e.clientX
-  startY = e.clientY
-}
-
-const handleMouseUp = () => {
-  isDragging.value = false
-  
-  if (dialogElement) {
-    dialogElement.style.cursor = ''
-    dialogElement.style.userSelect = ''
-  }
-
-  document.removeEventListener('mousemove', handleMouseMove)
-  document.removeEventListener('mouseup', handleMouseUp)
 }
 </script>
 

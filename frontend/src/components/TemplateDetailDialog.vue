@@ -176,8 +176,12 @@
           :model-value="currentViewingParam.defaultValue || ''"
           :title="`${currentViewingParam.paramName} - 默认值 (只读)`"
           :language="getEditorLanguage(currentViewingParam.paramType)"
+          theme="vs"
           height="60vh"
-          readonly
+          width="100%"
+          placeholder="暂无数据"
+          :options="{}"
+          :readonly="true"
           :show-toolbar="true"
           :show-status="true"
           class="viewer-editor"
