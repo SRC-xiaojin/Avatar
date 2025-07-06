@@ -2,6 +2,7 @@ package com.operatorchoreography.generator.controller;
 
 import com.operatorchoreography.generator.model.Workflows;
 import com.operatorchoreography.generator.service.WorkflowsService;
+import com.operatorchoreography.generator.dto.WorkflowSaveRequest;
 import com.operatorchoreography.common.Result;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -156,6 +157,21 @@ public class WorkflowsController {
             return Result.success(result, "工作流测试完成");
         } catch (Exception e) {
             return Result.error("测试工作流时发生错误: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 保存完整工作流（包含工作流、节点和连线数据）
+     * 支持新建和更新操作，保证事务性
+     */
+    @Operation(summary = "保存完整工作流", description = "一次性保存工作流基本信息、节点数据和连线数据，保证事务性")
+    @PostMapping("/save-complete")
+    public Result<Workflows> saveCompleteWorkflow(@RequestBody WorkflowSaveRequest request) {
+        try {
+            Workflows workflow = workflowsService.saveCompleteWorkflow(request);
+            return Result.success(workflow, "工作流保存成功");
+        } catch (Exception e) {
+            return Result.error("保存工作流时发生错误: " + e.getMessage());
         }
     }
 }

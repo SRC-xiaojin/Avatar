@@ -126,6 +126,52 @@ export interface WorkflowExecution {
   endTime?: string;
 }
 
+// 工作流保存请求类型
+export interface WorkflowSaveRequest {
+  workflow: WorkflowSaveData;
+  nodes: NodeSaveData[];
+  connections: ConnectionSaveData[];
+}
+
+export interface WorkflowSaveData {
+  id?: number;
+  workflowName: string;
+  workflowCode: string;
+  description?: string;
+  status?: string;
+  version?: string;
+  executionMode?: string;
+  maxExecutionTime?: number;
+  tags?: string;
+  variables?: string;
+}
+
+export interface NodeSaveData {
+  id?: number;
+  nodeCode: string;
+  nodeName: string;
+  templateId: number;
+  positionX?: number;
+  positionY?: number;
+  width?: number;
+  height?: number;
+  style?: string;
+  isEnabled?: boolean;
+  executionOrder?: number;
+  onError?: string;
+  retryCount?: number;
+  nodeConfig?: string;
+  // 前端画布节点ID，用于映射连线
+  canvasNodeId?: number;
+}
+
+export interface ConnectionSaveData {
+  id?: number;
+  sourceCanvasNodeId?: number;  // 前端画布节点ID
+  targetCanvasNodeId?: number;  // 前端画布节点ID
+  connectionType?: string;
+}
+
 // 节点执行类型
 export interface NodeExecution {
   id?: number;

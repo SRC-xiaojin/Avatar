@@ -1,6 +1,7 @@
 package com.operatorchoreography.generator.service;
 
 import com.operatorchoreography.generator.model.Workflows;
+import com.operatorchoreography.generator.dto.WorkflowSaveRequest;
 import com.baomidou.mybatisplus.extension.service.IService;
 
 import java.util.List;
@@ -35,4 +36,10 @@ public interface WorkflowsService extends IService<Workflows> {
      * 测试工作流
      */
     Map<String, Object> testWorkflow(Long workflowId, Map<String, Object> inputData);
+
+    /**
+     * 保存完整工作流（包含工作流、节点和连线数据）
+     * 支持新建和更新操作，保证事务性
+     */
+    Workflows saveCompleteWorkflow(WorkflowSaveRequest request);
 }

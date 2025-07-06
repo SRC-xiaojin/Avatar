@@ -9,6 +9,7 @@ import com.operatorchoreography.generator.service.WorkflowsService;
 import com.operatorchoreography.generator.service.WorkflowNodesService;
 import com.operatorchoreography.generator.service.WorkflowConnectionsService;
 import com.operatorchoreography.generator.service.OperatorTemplatesService;
+import com.operatorchoreography.generator.dto.WorkflowSaveRequest;
 import com.operatorchoreography.executor.ExecutorManager;
 import com.operatorchoreography.executor.ExecutorResult;
 import com.operatorchoreography.executor.ExecutorStatus;
@@ -16,6 +17,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDateTime;
@@ -388,6 +390,163 @@ public class WorkflowsServiceImpl extends ServiceImpl<WorkflowsMapper, Workflows
             log.info("超时时间: {}秒", template.getTimeoutSeconds());
             log.info("重试次数: {}", template.getRetryCount());
             log.info("========================");
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Workflows saveCompleteWorkflow(WorkflowSaveRequest request) {
+        try {
+            log.info("开始保存完整工作流数据...");
+            
+            // 1. 保存或更新工作流基本信息
+            Workflows workflow = saveWorkflowBasicInfo(request.getWorkflow());
+            Long workflowId = workflow.getId();
+            
+            log.info("工作流基本信息保存成功，ID: {}", workflowId);
+            
+            // 2. 删除现有的节点和连线（如果是更新操作）
+            if (request.getWorkflow().getId() != null) {
+                cleanExistingNodesAndConnections(workflowId);
+            }
+            
+            // 3. 保存节点并创建节点ID映射
+            Map<Integer, Long> nodeIdMapping = saveWorkflowNodes(workflowId, request.getNodes());
+            
+            log.info("节点保存成功，节点数量: {}", request.getNodes().size());
+            
+            // 4. 保存连线
+            saveWorkflowConnections(workflowId, request.getConnections(), nodeIdMapping);
+            
+            log.info("连线保存成功，连线数量: {}", request.getConnections().size());
+            
+            log.info("完整工作流保存成功: {}", workflow.getWorkflowName());
+            
+            return workflow;
+            
+        } catch (Exception e) {
+            log.error("保存完整工作流失败: {}", e.getMessage(), e);
+            throw new RuntimeException("保存工作流失败: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 保存工作流基本信息
+     */
+    private Workflows saveWorkflowBasicInfo(WorkflowSaveRequest.WorkflowData workflowData) {
+        Workflows workflow = new Workflows();
+        
+        // 设置基本信息
+        if (workflowData.getId() != null) {
+            workflow.setId(workflowData.getId());
+        }
+        workflow.setWorkflowName(workflowData.getWorkflowName());
+        workflow.setWorkflowCode(workflowData.getWorkflowCode());
+        workflow.setDescription(workflowData.getDescription());
+        workflow.setStatus(workflowData.getStatus() != null ? workflowData.getStatus() : "DRAFT");
+        workflow.setVersion(workflowData.getVersion() != null ? workflowData.getVersion() : "1.0.0");
+        workflow.setExecutionMode(workflowData.getExecutionMode() != null ? workflowData.getExecutionMode() : "SYNC");
+        workflow.setMaxExecutionTime(workflowData.getMaxExecutionTime() != null ? workflowData.getMaxExecutionTime() : 300);
+        workflow.setTags(workflowData.getTags());
+        workflow.setVariables(workflowData.getVariables());
+        
+        // 保存或更新
+        if (workflowData.getId() != null) {
+            this.updateById(workflow);
+        } else {
+            this.save(workflow);
+        }
+        
+        return workflow;
+    }
+
+    /**
+     * 清理现有的节点和连线
+     */
+    private void cleanExistingNodesAndConnections(Long workflowId) {
+        // 删除现有连线
+        QueryWrapper<WorkflowConnections> connectionQuery = new QueryWrapper<>();
+        connectionQuery.eq("workflow_id", workflowId);
+        workflowConnectionsService.remove(connectionQuery);
+        
+        // 删除现有节点
+        QueryWrapper<WorkflowNodes> nodeQuery = new QueryWrapper<>();
+        nodeQuery.eq("workflow_id", workflowId);
+        workflowNodesService.remove(nodeQuery);
+        
+        log.info("清理工作流 {} 的现有节点和连线完成", workflowId);
+    }
+
+    /**
+     * 保存工作流节点
+     */
+    private Map<Integer, Long> saveWorkflowNodes(Long workflowId, List<WorkflowSaveRequest.NodeData> nodeDataList) {
+        Map<Integer, Long> nodeIdMapping = new HashMap<>();
+        
+        if (nodeDataList == null || nodeDataList.isEmpty()) {
+            return nodeIdMapping;
+        }
+        
+        for (WorkflowSaveRequest.NodeData nodeData : nodeDataList) {
+            WorkflowNodes node = new WorkflowNodes();
+            
+            node.setWorkflowId(workflowId);
+            node.setNodeCode(nodeData.getNodeCode());
+            node.setNodeName(nodeData.getNodeName());
+            node.setTemplateId(nodeData.getTemplateId());
+            node.setPositionX(nodeData.getPositionX() != null ? nodeData.getPositionX() : 0.0);
+            node.setPositionY(nodeData.getPositionY() != null ? nodeData.getPositionY() : 0.0);
+            node.setWidth(nodeData.getWidth() != null ? nodeData.getWidth() : 100.0);
+            node.setHeight(nodeData.getHeight() != null ? nodeData.getHeight() : 60.0);
+            node.setStyle(nodeData.getStyle());
+            node.setIsEnabled(nodeData.getIsEnabled() != null ? nodeData.getIsEnabled() : true);
+            node.setExecutionOrder(nodeData.getExecutionOrder() != null ? nodeData.getExecutionOrder() : 0);
+            node.setOnError(nodeData.getOnError() != null ? nodeData.getOnError() : "STOP");
+            node.setRetryCount(nodeData.getRetryCount() != null ? nodeData.getRetryCount() : 0);
+            
+            // 保存节点
+            workflowNodesService.save(node);
+            
+            // 创建节点ID映射（前端画布ID -> 数据库ID）
+            if (nodeData.getCanvasNodeId() != null) {
+                nodeIdMapping.put(nodeData.getCanvasNodeId(), node.getId());
+            }
+        }
+        
+        return nodeIdMapping;
+    }
+
+    /**
+     * 保存工作流连线
+     */
+    private void saveWorkflowConnections(Long workflowId, List<WorkflowSaveRequest.ConnectionData> connectionDataList, 
+                                        Map<Integer, Long> nodeIdMapping) {
+        if (connectionDataList == null || connectionDataList.isEmpty()) {
+            return;
+        }
+        
+        for (WorkflowSaveRequest.ConnectionData connectionData : connectionDataList) {
+            WorkflowConnections connection = new WorkflowConnections();
+            
+            // 通过映射获取真实的数据库节点ID
+            Long sourceNodeId = nodeIdMapping.get(connectionData.getSourceCanvasNodeId());
+            Long targetNodeId = nodeIdMapping.get(connectionData.getTargetCanvasNodeId());
+            
+            if (sourceNodeId == null || targetNodeId == null) {
+                log.warn("连线节点映射失败: sourceCanvasId={}, targetCanvasId={}, sourceDbId={}, targetDbId={}", 
+                        connectionData.getSourceCanvasNodeId(), connectionData.getTargetCanvasNodeId(),
+                        sourceNodeId, targetNodeId);
+                continue;
+            }
+            
+            connection.setWorkflowId(workflowId);
+            connection.setSourceNodeId(sourceNodeId);
+            connection.setTargetNodeId(targetNodeId);
+            connection.setConnectionType(connectionData.getConnectionType() != null ? 
+                                        connectionData.getConnectionType() : "DATA_FLOW");
+            
+            // 保存连线
+            workflowConnectionsService.save(connection);
         }
     }
 }

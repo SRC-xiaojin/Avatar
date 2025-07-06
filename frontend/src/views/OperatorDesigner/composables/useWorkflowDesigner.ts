@@ -2,10 +2,9 @@ import { ref } from 'vue'
 import type { Ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { categoryApi } from '@/api/categories'
-import { templateApi } from '@/api/templates'
-import { workflowApi, connectionApi } from '@/api/workflows'
-import { nodeApi } from '@/api/nodes'
+import { categoryApi } from '@/api/categories.ts'
+import { templateApi } from '@/api/templates.ts'
+import { workflowApi, connectionApi, nodeApi } from '@/api/workflows.ts'
 import type { 
   UIOperatorCategory, 
   UIOperatorTemplate, 

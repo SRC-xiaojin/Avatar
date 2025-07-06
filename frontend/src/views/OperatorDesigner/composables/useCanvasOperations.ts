@@ -2,8 +2,7 @@ import { ref, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import type { Ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { workflowApi, connectionApi } from '@/api/workflows'
-import { nodeApi } from '@/api/nodes'
+import { workflowApi, connectionApi, nodeApi } from '@/api/workflows.ts'
 import type { 
   CanvasNode, 
   Connection, 
@@ -17,7 +16,11 @@ import type {
 import type {
   Workflow as WorkflowData,
   WorkflowNode as NodeData,
-  WorkflowConnection as ConnectionData
+  WorkflowConnection as ConnectionData,
+  WorkflowSaveRequest,
+  WorkflowSaveData,
+  NodeSaveData,
+  ConnectionSaveData
 } from '@/types/api'
 
 export function useCanvasOperations(
@@ -277,106 +280,76 @@ export function useCanvasOperations(
     try {
       console.log('开始保存工作流...')
       
-      const workflowData: WorkflowData = {
+      // 1. 构建工作流基本数据
+      const workflowData: WorkflowSaveData = {
+        id: currentWorkflowId.value || undefined,
         workflowName: `设计器工作流_${Date.now()}`,
         workflowCode: `WORKFLOW_${Date.now()}`,
         description: '通过可视化设计器创建的工作流',
         status: 'DRAFT',
-        nodeCount: canvasNodes.value.length
+        version: '1.0.0',
+        executionMode: 'SYNC',
+        maxExecutionTime: 300
       }
       
-      // 保存工作流
-      let workflowId: number
+      // 2. 构建节点数据
+      const nodeDataList: NodeSaveData[] = canvasNodes.value.map(node => ({
+        nodeCode: `NODE_${node.id}`,
+        nodeName: node.name,
+        templateId: node.templateId,
+        positionX: node.x,
+        positionY: node.y,
+        width: 100,
+        height: 60,
+        isEnabled: true,
+        executionOrder: 0,
+        onError: 'STOP',
+        retryCount: 0,
+        nodeConfig: JSON.stringify(node.config),
+        canvasNodeId: node.id
+      }))
       
-      if (currentWorkflowId.value) {
-        // 更新现有工作流
-        const updateResult = await workflowApi.updateWorkflow(currentWorkflowId.value, workflowData)
-        if (!updateResult.success) {
-          throw new Error(updateResult.message)
-        }
-        workflowId = currentWorkflowId.value
-        console.log('工作流更新成功:', workflowId)
-      } else {
-        // 创建新工作流
-        const createResult = await workflowApi.createWorkflow(workflowData)
-        if (!createResult.success) {
-          throw new Error(createResult.message)
-        }
-        workflowId = createResult.data?.id || Date.now()
-        currentWorkflowId.value = workflowId
-        console.log('工作流创建成功:', workflowId)
+      // 3. 构建连线数据
+      const connectionDataList: ConnectionSaveData[] = connections.value.map(connection => ({
+        sourceCanvasNodeId: connection.sourceNodeId,
+        targetCanvasNodeId: connection.targetNodeId,
+        connectionType: connection.type || 'DATA_FLOW'
+      }))
+      
+      // 4. 构建完整保存请求
+      const saveRequest: WorkflowSaveRequest = {
+        workflow: workflowData,
+        nodes: nodeDataList,
+        connections: connectionDataList
       }
       
-             // 清空现有节点和连接
-       await Promise.all([
-         nodeApi.getNodesByWorkflow(workflowId),
-         connectionApi.deleteConnectionsByWorkflow(workflowId)
-       ])
-      
-      // 保存节点
-      const nodePromises = canvasNodes.value.map(node => {
-        const nodeData: NodeData = {
-          workflowId,
-          nodeCode: `NODE_${node.id}`,
-          nodeName: node.name,
-          templateId: node.templateId,
-          positionX: node.x,
-          positionY: node.y,
-          nodeConfig: JSON.stringify(node.config),
-          status: true
-        }
-        
-        return nodeApi.createNode(nodeData)
+      console.log('保存请求数据:', {
+        工作流: workflowData,
+        节点数量: nodeDataList.length,
+        连线数量: connectionDataList.length,
+        完整请求: saveRequest
       })
       
-      const nodeResults = await Promise.all(nodePromises)
-      const failedNodes = nodeResults.filter((result: any) => !result.success)
+      // 5. 调用统一保存接口
+      const result = await workflowApi.saveCompleteWorkflow(saveRequest)
       
-      if (failedNodes.length > 0) {
-        throw new Error(`保存节点失败: ${failedNodes.map((r: any) => r.message).join(', ')}`)
+      if (!result.success) {
+        throw new Error(result.message || '保存工作流失败')
       }
       
-      // 创建节点ID映射
-      const nodeIdMap = new Map<number, number>()
-      nodeResults.forEach((result: any, index: number) => {
-        if (result.success) {
-          nodeIdMap.set(canvasNodes.value[index].id, result.data?.id || Date.now())
-        }
-      })
-      
-      // 保存连接
-      const connectionPromises = connections.value.map(connection => {
-        const sourceDbId = nodeIdMap.get(connection.sourceNodeId)
-        const targetDbId = nodeIdMap.get(connection.targetNodeId)
-        
-        if (!sourceDbId || !targetDbId) {
-          throw new Error(`无法找到节点映射: source=${connection.sourceNodeId}, target=${connection.targetNodeId}`)
-        }
-        
-        const connectionData: ConnectionData = {
-          workflowId,
-          sourceNodeId: sourceDbId,
-          targetNodeId: targetDbId,
-          connectionType: connection.type || 'DATA_FLOW'
-        }
-        
-        return connectionApi.createConnection(connectionData)
-      })
-      
-      const connectionResults = await Promise.all(connectionPromises)
-      const failedConnections = connectionResults.filter((result: any) => !result.success)
-      
-      if (failedConnections.length > 0) {
-        throw new Error(`保存连接失败: ${failedConnections.map((r: any) => r.message).join(', ')}`)
+      // 6. 更新当前工作流ID
+      if (result.data?.id) {
+        currentWorkflowId.value = result.data.id
       }
       
       console.log('工作流保存成功:', {
-        工作流ID: workflowId,
-        节点数量: canvasNodes.value.length,
-        连接数量: connections.value.length
+        工作流ID: result.data?.id,
+        工作流名称: result.data?.workflowName,
+        节点数量: nodeDataList.length,
+        连线数量: connectionDataList.length
       })
       
-      ElMessage.success(`工作流保存成功！节点: ${canvasNodes.value.length}个，连接: ${connections.value.length}个`)
+      ElMessage.success(`工作流保存成功！节点: ${nodeDataList.length}个，连接: ${connectionDataList.length}个`)
       
     } catch (error) {
       console.error('保存工作流失败:', error)
