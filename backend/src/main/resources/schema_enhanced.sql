@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS operator_categories (
     icon VARCHAR(255) COMMENT '图标',
     sort_order INT DEFAULT 0 COMMENT '排序',
     status TINYINT DEFAULT 1 COMMENT '状态: 1启用 0禁用',
+    if_delete tinyint(1) unsigned DEFAULT '0' COMMENT '0 未删除 1 已删除',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='算子类别表';
@@ -63,6 +64,8 @@ CREATE TABLE IF NOT EXISTS operator_template_params (
     default_value TEXT COMMENT '默认值',
     validation_rules JSON COMMENT '验证规则',
     
+    if_delete tinyint(1) unsigned DEFAULT '0' COMMENT '0 未删除 1 已删除',
+    
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     
@@ -90,6 +93,8 @@ CREATE TABLE IF NOT EXISTS workflows (
     -- 元数据
     tags JSON COMMENT '标签',
     variables JSON COMMENT '工作流变量',
+    
+    if_delete tinyint(1) unsigned DEFAULT '0' COMMENT '0 未删除 1 已删除',
     
     created_by VARCHAR(100) COMMENT '创建人',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -126,6 +131,8 @@ CREATE TABLE IF NOT EXISTS workflow_nodes (
     on_error VARCHAR(50) DEFAULT 'STOP' COMMENT '错误处理: STOP,CONTINUE,RETRY',
     retry_count INT DEFAULT 0 COMMENT '重试次数',
     
+    if_delete tinyint(1) unsigned DEFAULT '0' COMMENT '0 未删除 1 已删除',
+    
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     
@@ -147,6 +154,8 @@ CREATE TABLE IF NOT EXISTS workflow_node_params (
     -- 数据来源
     value_source VARCHAR(50) DEFAULT 'STATIC' COMMENT '值来源: STATIC,VARIABLE,EXPRESSION,INPUT',
     source_expression TEXT COMMENT '取值表达式',
+    
+    if_delete tinyint(1) unsigned DEFAULT '0' COMMENT '0 未删除 1 已删除',
     
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -176,6 +185,8 @@ CREATE TABLE IF NOT EXISTS workflow_connections (
     
     -- 样式
     style JSON COMMENT '连接线样式',
+
+    if_delete tinyint(1) unsigned DEFAULT '0' COMMENT '0 未删除 1 已删除',
     
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',

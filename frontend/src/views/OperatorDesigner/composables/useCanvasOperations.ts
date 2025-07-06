@@ -1,8 +1,8 @@
-import { ref, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import type { Ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { workflowApi, connectionApi, nodeApi } from '@/api/workflows.ts'
+import { workflowApi } from '@/api/workflows.ts'
 import type { 
   CanvasNode, 
   Connection, 
@@ -14,9 +14,6 @@ import type {
   Size
 } from '../types'
 import type {
-  Workflow as WorkflowData,
-  WorkflowNode as NodeData,
-  WorkflowConnection as ConnectionData,
   WorkflowSaveRequest,
   WorkflowSaveData,
   NodeSaveData,

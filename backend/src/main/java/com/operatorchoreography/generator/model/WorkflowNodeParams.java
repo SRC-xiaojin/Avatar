@@ -55,6 +55,10 @@ public class WorkflowNodeParams implements Serializable {
     @TableField("source_expression")
     private String sourceExpression;
 
+    @Schema(description = "是否删除")
+    @TableField("if_delete")
+    private Boolean ifDelete;
+
     @Schema(description = "创建时间")
     @TableField(value = "created_at", fill = FieldFill.INSERT)
     private LocalDateTime createdAt;

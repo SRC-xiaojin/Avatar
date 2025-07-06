@@ -13,13 +13,14 @@
         <result column="is_required" property="isRequired" />
         <result column="default_value" property="defaultValue" />
         <result column="validation_rules" property="validationRules" />
+        <result column="if_delete" property="ifDelete" />
         <result column="created_at" property="createdAt" />
         <result column="updated_at" property="updatedAt" />
     </resultMap>
 
     <!-- 通用查询结果列 -->
     <sql id="Base_Column_List">
-        id, template_id, param_key, param_name, param_type, param_category, is_required, default_value, validation_rules, created_at, updated_at
+        id, template_id, param_key, param_name, param_type, param_category, is_required, default_value, validation_rules, if_delete, created_at, updated_at
     </sql>
 
 </mapper>

@@ -50,7 +50,9 @@ public class WorkflowsServiceImpl extends ServiceImpl<WorkflowsMapper, Workflows
     @Override
     public Map<String, Object> executeWorkflow(Long workflowId, Map<String, Object> inputData) {
         // 模拟工作流执行逻辑
-        Workflows workflow = this.getById(workflowId);
+        QueryWrapper<Workflows> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("id", workflowId).eq("if_delete", false);
+        Workflows workflow = this.getOne(queryWrapper);
         if (workflow == null) {
             throw new RuntimeException("工作流不存在");
         }
@@ -72,7 +74,9 @@ public class WorkflowsServiceImpl extends ServiceImpl<WorkflowsMapper, Workflows
     @Override
     public boolean validateWorkflow(Long workflowId) {
         // 模拟工作流验证逻辑
-        Workflows workflow = this.getById(workflowId);
+        QueryWrapper<Workflows> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("id", workflowId).eq("if_delete", false);
+        Workflows workflow = this.getOne(queryWrapper);
         if (workflow == null) {
             return false;
         }
@@ -106,14 +110,16 @@ public class WorkflowsServiceImpl extends ServiceImpl<WorkflowsMapper, Workflows
         
         try {
             // 1. 验证工作流是否存在
-            Workflows workflow = this.getById(workflowId);
+            QueryWrapper<Workflows> queryWrapper = new QueryWrapper<>();
+            queryWrapper.eq("id", workflowId).eq("if_delete", false);
+            Workflows workflow = this.getOne(queryWrapper);
             if (workflow == null) {
                 throw new RuntimeException("工作流不存在: " + workflowId);
             }
 
             // 2. 获取工作流的所有节点
             QueryWrapper<WorkflowNodes> nodeQuery = new QueryWrapper<>();
-            nodeQuery.eq("workflow_id", workflowId);
+            nodeQuery.eq("workflow_id", workflowId).eq("if_delete", false);
             List<WorkflowNodes> nodes = workflowNodesService.list(nodeQuery);
             
             if (nodes.isEmpty()) {
@@ -122,7 +128,7 @@ public class WorkflowsServiceImpl extends ServiceImpl<WorkflowsMapper, Workflows
 
             // 3. 获取工作流的所有连接关系
             QueryWrapper<WorkflowConnections> connectionQuery = new QueryWrapper<>();
-            connectionQuery.eq("workflow_id", workflowId);
+            connectionQuery.eq("workflow_id", workflowId).eq("if_delete", false);
             List<WorkflowConnections> connections = workflowConnectionsService.list(connectionQuery);
 
             // 4. 构建节点执行队列（拓扑排序）
@@ -405,18 +411,18 @@ public class WorkflowsServiceImpl extends ServiceImpl<WorkflowsMapper, Workflows
             
             log.info("工作流基本信息保存成功，ID: {}", workflowId);
             
-            // 2. 删除现有的节点和连线（如果是更新操作）
+            // 2. 逻辑删除现有的节点和连线（如果是更新操作）
             if (request.getWorkflow().getId() != null) {
-                cleanExistingNodesAndConnections(workflowId);
+                logicalDeleteExistingNodesAndConnections(workflowId);
             }
             
-            // 3. 保存节点并创建节点ID映射
-            Map<Integer, Long> nodeIdMapping = saveWorkflowNodes(workflowId, request.getNodes());
+            // 3. 保存或更新节点并创建节点ID映射
+            Map<Integer, Long> nodeIdMapping = saveOrUpdateWorkflowNodes(workflowId, request.getNodes());
             
             log.info("节点保存成功，节点数量: {}", request.getNodes().size());
             
-            // 4. 保存连线
-            saveWorkflowConnections(workflowId, request.getConnections(), nodeIdMapping);
+            // 4. 保存或更新连线
+            saveOrUpdateWorkflowConnections(workflowId, request.getConnections(), nodeIdMapping);
             
             log.info("连线保存成功，连线数量: {}", request.getConnections().size());
             
@@ -461,37 +467,69 @@ public class WorkflowsServiceImpl extends ServiceImpl<WorkflowsMapper, Workflows
     }
 
     /**
-     * 清理现有的节点和连线
+     * 逻辑删除现有的节点和连线
      */
-    private void cleanExistingNodesAndConnections(Long workflowId) {
-        // 删除现有连线
+    private void logicalDeleteExistingNodesAndConnections(Long workflowId) {
+        // 逻辑删除现有连线
         QueryWrapper<WorkflowConnections> connectionQuery = new QueryWrapper<>();
-        connectionQuery.eq("workflow_id", workflowId);
-        workflowConnectionsService.remove(connectionQuery);
+        connectionQuery.eq("workflow_id", workflowId).eq("if_delete", false);
+        connectionQuery.eq("if_delete", false);  // 只处理未删除的记录
+        List<WorkflowConnections> existingConnections = workflowConnectionsService.list(connectionQuery);
         
-        // 删除现有节点
+        for (WorkflowConnections connection : existingConnections) {
+            connection.setIfDelete(true);
+            workflowConnectionsService.updateById(connection);
+        }
+        
+        // 逻辑删除现有节点
         QueryWrapper<WorkflowNodes> nodeQuery = new QueryWrapper<>();
-        nodeQuery.eq("workflow_id", workflowId);
-        workflowNodesService.remove(nodeQuery);
+        nodeQuery.eq("workflow_id", workflowId).eq("if_delete", false);
+        nodeQuery.eq("if_delete", false);  // 只处理未删除的记录
+        List<WorkflowNodes> existingNodes = workflowNodesService.list(nodeQuery);
         
-        log.info("清理工作流 {} 的现有节点和连线完成", workflowId);
+        for (WorkflowNodes node : existingNodes) {
+            node.setIfDelete(true);
+            workflowNodesService.updateById(node);
+        }
+        
+        log.info("逻辑删除工作流 {} 的现有节点和连线完成，节点数量: {}, 连线数量: {}", 
+                workflowId, existingNodes.size(), existingConnections.size());
     }
 
     /**
-     * 保存工作流节点
+     * 保存或更新工作流节点
      */
-    private Map<Integer, Long> saveWorkflowNodes(Long workflowId, List<WorkflowSaveRequest.NodeData> nodeDataList) {
+    private Map<Integer, Long> saveOrUpdateWorkflowNodes(Long workflowId, List<WorkflowSaveRequest.NodeData> nodeDataList) {
         Map<Integer, Long> nodeIdMapping = new HashMap<>();
         
         if (nodeDataList == null || nodeDataList.isEmpty()) {
             return nodeIdMapping;
         }
         
+        // 获取现有节点映射（基于nodeCode）
+        QueryWrapper<WorkflowNodes> existingQuery = new QueryWrapper<>();
+        existingQuery.eq("workflow_id", workflowId).eq("if_delete", false);
+        List<WorkflowNodes> existingNodes = workflowNodesService.list(existingQuery);
+        Map<String, WorkflowNodes> existingNodeMap = new HashMap<>();
+        for (WorkflowNodes node : existingNodes) {
+            existingNodeMap.put(node.getNodeCode(), node);
+        }
+        
         for (WorkflowSaveRequest.NodeData nodeData : nodeDataList) {
-            WorkflowNodes node = new WorkflowNodes();
+            WorkflowNodes node;
+            boolean isUpdate = false;
             
-            node.setWorkflowId(workflowId);
-            node.setNodeCode(nodeData.getNodeCode());
+            // 检查是否为现有节点
+            if (existingNodeMap.containsKey(nodeData.getNodeCode())) {
+                node = existingNodeMap.get(nodeData.getNodeCode());
+                isUpdate = true;
+            } else {
+                node = new WorkflowNodes();
+                node.setWorkflowId(workflowId);
+                node.setNodeCode(nodeData.getNodeCode());
+            }
+            
+            // 设置节点属性
             node.setNodeName(nodeData.getNodeName());
             node.setTemplateId(nodeData.getTemplateId());
             node.setPositionX(nodeData.getPositionX() != null ? nodeData.getPositionX() : 0.0);
@@ -503,9 +541,16 @@ public class WorkflowsServiceImpl extends ServiceImpl<WorkflowsMapper, Workflows
             node.setExecutionOrder(nodeData.getExecutionOrder() != null ? nodeData.getExecutionOrder() : 0);
             node.setOnError(nodeData.getOnError() != null ? nodeData.getOnError() : "STOP");
             node.setRetryCount(nodeData.getRetryCount() != null ? nodeData.getRetryCount() : 0);
+            node.setIfDelete(false);  // 确保设置为未删除状态
             
-            // 保存节点
-            workflowNodesService.save(node);
+            // 保存或更新节点
+            if (isUpdate) {
+                workflowNodesService.updateById(node);
+                log.debug("更新节点: {}", nodeData.getNodeCode());
+            } else {
+                workflowNodesService.save(node);
+                log.debug("新增节点: {}", nodeData.getNodeCode());
+            }
             
             // 创建节点ID映射（前端画布ID -> 数据库ID）
             if (nodeData.getCanvasNodeId() != null) {
@@ -517,17 +562,25 @@ public class WorkflowsServiceImpl extends ServiceImpl<WorkflowsMapper, Workflows
     }
 
     /**
-     * 保存工作流连线
+     * 保存或更新工作流连线
      */
-    private void saveWorkflowConnections(Long workflowId, List<WorkflowSaveRequest.ConnectionData> connectionDataList, 
-                                        Map<Integer, Long> nodeIdMapping) {
+    private void saveOrUpdateWorkflowConnections(Long workflowId, List<WorkflowSaveRequest.ConnectionData> connectionDataList, 
+                                               Map<Integer, Long> nodeIdMapping) {
         if (connectionDataList == null || connectionDataList.isEmpty()) {
             return;
         }
         
+        // 获取现有连线映射（基于源节点ID和目标节点ID）
+        QueryWrapper<WorkflowConnections> existingQuery = new QueryWrapper<>();
+        existingQuery.eq("workflow_id", workflowId).eq("if_delete", false);
+        List<WorkflowConnections> existingConnections = workflowConnectionsService.list(existingQuery);
+        Map<String, WorkflowConnections> existingConnectionMap = new HashMap<>();
+        for (WorkflowConnections conn : existingConnections) {
+            String key = conn.getSourceNodeId() + "-" + conn.getTargetNodeId();
+            existingConnectionMap.put(key, conn);
+        }
+        
         for (WorkflowSaveRequest.ConnectionData connectionData : connectionDataList) {
-            WorkflowConnections connection = new WorkflowConnections();
-            
             // 通过映射获取真实的数据库节点ID
             Long sourceNodeId = nodeIdMapping.get(connectionData.getSourceCanvasNodeId());
             Long targetNodeId = nodeIdMapping.get(connectionData.getTargetCanvasNodeId());
@@ -539,14 +592,34 @@ public class WorkflowsServiceImpl extends ServiceImpl<WorkflowsMapper, Workflows
                 continue;
             }
             
-            connection.setWorkflowId(workflowId);
-            connection.setSourceNodeId(sourceNodeId);
-            connection.setTargetNodeId(targetNodeId);
+            WorkflowConnections connection;
+            boolean isUpdate = false;
+            String connectionKey = sourceNodeId + "-" + targetNodeId;
+            
+            // 检查是否为现有连线
+            if (existingConnectionMap.containsKey(connectionKey)) {
+                connection = existingConnectionMap.get(connectionKey);
+                isUpdate = true;
+            } else {
+                connection = new WorkflowConnections();
+                connection.setWorkflowId(workflowId);
+                connection.setSourceNodeId(sourceNodeId);
+                connection.setTargetNodeId(targetNodeId);
+            }
+            
+            // 设置连线属性
             connection.setConnectionType(connectionData.getConnectionType() != null ? 
                                         connectionData.getConnectionType() : "DATA_FLOW");
+            connection.setIfDelete(false);  // 确保设置为未删除状态
             
-            // 保存连线
-            workflowConnectionsService.save(connection);
+            // 保存或更新连线
+            if (isUpdate) {
+                workflowConnectionsService.updateById(connection);
+                log.debug("更新连线: {} -> {}", sourceNodeId, targetNodeId);
+            } else {
+                workflowConnectionsService.save(connection);
+                log.debug("新增连线: {} -> {}", sourceNodeId, targetNodeId);
+            }
         }
     }
 }

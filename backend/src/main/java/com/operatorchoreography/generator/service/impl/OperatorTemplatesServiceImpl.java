@@ -41,6 +41,7 @@ public class OperatorTemplatesServiceImpl extends ServiceImpl<OperatorTemplatesM
     public List<OperatorTemplates> getTemplatesByCategory(Long categoryId) {
         QueryWrapper<OperatorTemplates> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("category_id", categoryId)
+                   .eq("if_delete", false)
                    .eq("status", true)
                    .orderByAsc("sort_order");
         return this.list(queryWrapper);
@@ -49,7 +50,7 @@ public class OperatorTemplatesServiceImpl extends ServiceImpl<OperatorTemplatesM
     @Override
     public OperatorTemplates getByTemplateCode(String templateCode) {
         QueryWrapper<OperatorTemplates> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("template_code", templateCode);
+        queryWrapper.eq("template_code", templateCode).eq("if_delete", false);
         return this.getOne(queryWrapper);
     }
 
@@ -61,7 +62,9 @@ public class OperatorTemplatesServiceImpl extends ServiceImpl<OperatorTemplatesM
         LocalDateTime startTime = LocalDateTime.now();
         
         try {
-            OperatorTemplates template = this.getById(templateId);
+            QueryWrapper<OperatorTemplates> queryWrapper = new QueryWrapper<>();
+            queryWrapper.eq("id", templateId).eq("if_delete", false);
+            OperatorTemplates template = this.getOne(queryWrapper);
             if (template == null) {
                 log.error("算子模板不存在: templateId={}", templateId);
                 LocalDateTime endTime = LocalDateTime.now();
@@ -106,6 +109,7 @@ public class OperatorTemplatesServiceImpl extends ServiceImpl<OperatorTemplatesM
     public List<Map<String, Object>> getTemplateParams(Long templateId) {
         QueryWrapper<OperatorTemplateParams> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("template_id", templateId)
+                   .eq("if_delete", false)
                    .orderByAsc("id");
         
         List<OperatorTemplateParams> params = operatorTemplateParamsService.list(queryWrapper);

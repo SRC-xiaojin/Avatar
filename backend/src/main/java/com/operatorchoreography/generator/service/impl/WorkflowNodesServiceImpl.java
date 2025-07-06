@@ -34,6 +34,7 @@ public class WorkflowNodesServiceImpl extends ServiceImpl<WorkflowNodesMapper, W
     public List<WorkflowNodes> getNodesByWorkflowId(Long workflowId) {
         QueryWrapper<WorkflowNodes> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("workflow_id", workflowId)
+                   .eq("if_delete", false)
                    .orderByAsc("id");
         return this.list(queryWrapper);
     }
@@ -41,7 +42,7 @@ public class WorkflowNodesServiceImpl extends ServiceImpl<WorkflowNodesMapper, W
     @Override
     public List<Map<String, Object>> getNodeParams(Long nodeId) {
         QueryWrapper<WorkflowNodeParams> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("node_id", nodeId);
+        queryWrapper.eq("node_id", nodeId).eq("if_delete", false);
         
         List<WorkflowNodeParams> params = workflowNodeParamsService.list(queryWrapper);
         
@@ -61,7 +62,7 @@ public class WorkflowNodesServiceImpl extends ServiceImpl<WorkflowNodesMapper, W
         try {
             // 先删除现有的参数配置
             QueryWrapper<WorkflowNodeParams> deleteWrapper = new QueryWrapper<>();
-            deleteWrapper.eq("node_id", nodeId);
+            deleteWrapper.eq("node_id", nodeId).eq("if_delete", false);
             workflowNodeParamsService.remove(deleteWrapper);
             
             // 添加新的参数配置

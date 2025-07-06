@@ -23,14 +23,14 @@ public class WorkflowConnectionsServiceImpl extends ServiceImpl<WorkflowConnecti
     @Override
     public List<WorkflowConnections> getConnectionsByWorkflowId(Long workflowId) {
         QueryWrapper<WorkflowConnections> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("workflow_id", workflowId);
+        queryWrapper.eq("workflow_id", workflowId).eq("if_delete", false);
         return this.list(queryWrapper);
     }
 
     @Override
     public boolean deleteByWorkflowId(Long workflowId) {
         QueryWrapper<WorkflowConnections> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("workflow_id", workflowId);
+        queryWrapper.eq("workflow_id", workflowId).eq("if_delete", false);
         return this.remove(queryWrapper);
     }
 }

@@ -14,6 +14,7 @@
         <result column="max_execution_time" property="maxExecutionTime" />
         <result column="tags" property="tags" />
         <result column="variables" property="variables" />
+        <result column="if_delete" property="ifDelete" />
         <result column="created_by" property="createdBy" />
         <result column="created_at" property="createdAt" />
         <result column="updated_by" property="updatedBy" />
@@ -22,7 +23,7 @@
 
     <!-- 通用查询结果列 -->
     <sql id="Base_Column_List">
-        id, workflow_code, workflow_name, description, version, status, execution_mode, max_execution_time, tags, variables, created_by, created_at, updated_by, updated_at
+        id, workflow_code, workflow_name, description, version, status, execution_mode, max_execution_time, tags, variables, if_delete, created_by, created_at, updated_by, updated_at
     </sql>
 
 </mapper>

@@ -19,13 +19,14 @@
         <result column="timeout_seconds" property="timeoutSeconds" />
         <result column="retry_count" property="retryCount" />
         <result column="status" property="status" />
+        <result column="if_delete" property="ifDelete" />
         <result column="created_at" property="createdAt" />
         <result column="updated_at" property="updatedAt" />
     </resultMap>
 
     <!-- 通用查询结果列 -->
     <sql id="Base_Column_List">
-        id, category_id, template_code, template_name, description, icon, version, executor_class, executor_method, input_schema, output_schema, is_async, timeout_seconds, retry_count, status, created_at, updated_at
+        id, category_id, template_code, template_name, description, icon, version, executor_class, executor_method, input_schema, output_schema, is_async, timeout_seconds, retry_count, status, if_delete, created_at, updated_at
     </sql>
 
 </mapper>

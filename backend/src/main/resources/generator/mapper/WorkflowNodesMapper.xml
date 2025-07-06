@@ -18,13 +18,14 @@
         <result column="execution_order" property="executionOrder" />
         <result column="on_error" property="onError" />
         <result column="retry_count" property="retryCount" />
+        <result column="if_delete" property="ifDelete" />
         <result column="created_at" property="createdAt" />
         <result column="updated_at" property="updatedAt" />
     </resultMap>
 
     <!-- 通用查询结果列 -->
     <sql id="Base_Column_List">
-        id, workflow_id, node_code, node_name, template_id, position_x, position_y, width, height, style, is_enabled, execution_order, on_error, retry_count, created_at, updated_at
+        id, workflow_id, node_code, node_name, template_id, position_x, position_y, width, height, style, is_enabled, execution_order, on_error, retry_count, if_delete, created_at, updated_at
     </sql>
 
 </mapper>

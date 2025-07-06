@@ -23,14 +23,14 @@ public class OperatorTemplateParamsServiceImpl extends ServiceImpl<OperatorTempl
     @Override
     public List<OperatorTemplateParams> getParametersByTemplateId(Long templateId) {
         QueryWrapper<OperatorTemplateParams> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("template_id", templateId);
+        queryWrapper.eq("template_id", templateId).eq("if_delete", false);
         return this.list(queryWrapper);
     }
 
     @Override
     public boolean removeByTemplateId(Long templateId) {
         QueryWrapper<OperatorTemplateParams> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("template_id", templateId);
+        queryWrapper.eq("template_id", templateId).eq("if_delete", false);
         return this.remove(queryWrapper);
     }
 

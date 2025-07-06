@@ -11,13 +11,14 @@
         <result column="param_type" property="paramType" />
         <result column="value_source" property="valueSource" />
         <result column="source_expression" property="sourceExpression" />
+        <result column="if_delete" property="ifDelete" />
         <result column="created_at" property="createdAt" />
         <result column="updated_at" property="updatedAt" />
     </resultMap>
 
     <!-- 通用查询结果列 -->
     <sql id="Base_Column_List">
-        id, node_id, param_key, param_value, param_type, value_source, source_expression, created_at, updated_at
+        id, node_id, param_key, param_value, param_type, value_source, source_expression, if_delete, created_at, updated_at
     </sql>
 
 </mapper>

@@ -67,6 +67,10 @@ public class Workflows implements Serializable {
     @TableField("variables")
     private String variables;
 
+    @Schema(description = "是否删除")
+    @TableField("if_delete")
+    private Boolean ifDelete;
+
     @Schema(description = "创建人")
     @TableField("created_by")
     private String createdBy;
